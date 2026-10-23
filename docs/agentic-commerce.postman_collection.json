@@ -1,0 +1,105 @@
+{
+  "info": {
+    "name": "Agentic Commerce API",
+    "description": "Rotas da API. Rode \"Login\" primeiro: ele guarda o token na variável {{token}}, usada pelas demais.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "token", "value": "" },
+    { "key": "politicaId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Saúde",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "Autenticação",
+      "item": [
+        {
+          "name": "Cadastro",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": "{{baseUrl}}/usuarios",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Teste\",\n  \"email\": \"teste@exemplo.com\",\n  \"senha\": \"senha-forte-123\"\n}" }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.collectionVariables.set('token', pm.response.json().token);"] }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": "{{baseUrl}}/sessoes",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"teste@exemplo.com\",\n  \"senha\": \"senha-forte-123\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Políticas",
+      "item": [
+        {
+          "name": "Listar políticas",
+          "request": { "method": "GET", "url": "{{baseUrl}}/politicas" }
+        },
+        {
+          "name": "Criar política",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.collectionVariables.set('politicaId', pm.response.json().id);"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/politicas",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Eletrônicos\",\n  \"teto_por_compra\": 500,\n  \"categorias\": [\"smartphones\", \"laptops\"],\n  \"lojas\": [],\n  \"nivel_autonomia\": \"automatica\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Obter política",
+          "request": { "method": "GET", "url": "{{baseUrl}}/politicas/{{politicaId}}" }
+        },
+        {
+          "name": "Substituir política",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/politicas/{{politicaId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Livros\",\n  \"teto_por_compra\": 80,\n  \"categorias\": [\"books\"],\n  \"nivel_autonomia\": \"manual\",\n  \"ativa\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Remover política",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/politicas/{{politicaId}}" }
+        }
+      ]
+    }
+  ]
+}
