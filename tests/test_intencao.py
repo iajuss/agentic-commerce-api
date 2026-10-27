@@ -31,7 +31,11 @@ def test_interpreta_a_lista_de_compras(texto, esperado):
     assert interpretar_intencao(texto) == esperado
 
 
-@pytest.mark.parametrize("texto", ["", "   ", " , ; \n ", None])
+def test_conector_solto_nao_vira_item():
+    assert interpretar_intencao("arroz, e") == [item("arroz")]
+
+
+@pytest.mark.parametrize("texto", ["", "   ", " , ; \n ", ", ; e", None])
 def test_texto_sem_itens_devolve_lista_vazia(texto):
     assert interpretar_intencao(texto) == []
 
