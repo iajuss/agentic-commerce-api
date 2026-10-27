@@ -1,0 +1,84 @@
+{
+  "products": [
+    {
+      "id": 20,
+      "title": "Cooking Oil",
+      "category": "groceries",
+      "price": 4.99,
+      "rating": 4.8,
+      "stock": 10,
+      "shippingInformation": "Ships in 1-2 business days",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/cooking-oil/thumbnail.webp"
+    },
+    {
+      "id": 23,
+      "title": "Eggs",
+      "category": "groceries",
+      "price": 2.99,
+      "rating": 2.53,
+      "stock": 9,
+      "shippingInformation": "Ships in 1 week",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/eggs/thumbnail.webp"
+    },
+    {
+      "id": 32,
+      "title": "Milk",
+      "category": "groceries",
+      "price": 3.49,
+      "rating": 2.61,
+      "stock": 27,
+      "shippingInformation": "Ships in 2 weeks",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/milk/thumbnail.webp"
+    },
+    {
+      "id": 34,
+      "title": "Nescafe Coffee",
+      "category": "groceries",
+      "price": 7.99,
+      "rating": 4.82,
+      "stock": 57,
+      "shippingInformation": "Ships in 1-2 business days",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/nescafe-coffee/thumbnail.webp"
+    },
+    {
+      "id": 35,
+      "title": "Potatoes",
+      "category": "groceries",
+      "price": 2.29,
+      "rating": 4.81,
+      "stock": 13,
+      "shippingInformation": "Ships in 3-5 business days",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/potatoes/thumbnail.webp"
+    },
+    {
+      "id": 38,
+      "title": "Rice",
+      "category": "groceries",
+      "price": 5.99,
+      "rating": 3.18,
+      "stock": 59,
+      "shippingInformation": "Ships overnight",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/rice/thumbnail.webp"
+    },
+    {
+      "id": 39,
+      "title": "Soft Drinks",
+      "category": "groceries",
+      "price": 1.99,
+      "rating": 4.75,
+      "stock": 53,
+      "shippingInformation": "Ships in 2 weeks",
+      "availabilityStatus": "In Stock",
+      "thumbnail": "https://cdn.dummyjson.com/product-images/groceries/soft-drinks/thumbnail.webp"
+    }
+  ],
+  "total": 7,
+  "skip": 0,
+  "limit": 7
+}
