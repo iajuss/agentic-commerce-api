@@ -3,7 +3,7 @@
 from bson import ObjectId
 from bson.errors import InvalidId
 from flask import current_app
-from pymongo import MongoClient
+from pymongo import ASCENDING, DESCENDING, MongoClient
 
 from app.erros import ErroApi
 
@@ -14,7 +14,21 @@ def iniciar_banco(app, cliente=None):
         if not app.config["MONGO_URI"]:
             raise RuntimeError("MONGO_URI não definida. Copie .env.example para .env e preencha.")
         cliente = MongoClient(app.config["MONGO_URI"], serverSelectionTimeoutMS=5000, tz_aware=True)
-    app.extensions["mongo"] = cliente[app.config["MONGO_DB_NAME"]]
+    db = cliente[app.config["MONGO_DB_NAME"]]
+    app.extensions["mongo"] = db
+    criar_indices(db)
+
+
+def criar_indices(db):
+    """Cria os índices do contrato na inicialização."""
+    db["usuarios"].create_index("email", unique=True)
+    db["politicas"].create_index([("usuario_id", ASCENDING), ("criada_em", ASCENDING)])
+    db["solicitacoes"].create_index([("usuario_id", ASCENDING), ("criada_em", DESCENDING)])
+    db["autorizacoes"].create_index([("usuario_id", ASCENDING), ("status", ASCENDING)])
+    db["pedidos"].create_index([("usuario_id", ASCENDING), ("criado_em", DESCENDING)])
+    db["pedidos"].create_index("autorizacao_id", unique=True)
+    db["chamados"].create_index([("pedido_id", ASCENDING), ("criado_em", ASCENDING)])
+    db["auditoria"].create_index([("usuario_id", ASCENDING), ("criado_em", DESCENDING)])
 
 
 def banco():
