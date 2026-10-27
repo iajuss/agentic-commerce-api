@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Chaves SSH da EC2: nunca commitar
+*.pem
+*.ppk
+
 # Python
 __pycache__/
 *.py[cod]

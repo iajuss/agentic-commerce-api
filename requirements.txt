@@ -3,6 +3,7 @@ flask-cors==6.0.5
 flask-jwt-extended==4.7.4
 pymongo==4.19.0
 python-dotenv==1.2.4
+requests==2.34.2
 
 # Testes
 pytest==9.1.1
