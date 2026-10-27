@@ -1,0 +1,79 @@
+{
+  "info": {
+    "name": "Agentic Commerce API — Solicitações (M2)",
+    "description": "Rotas de /solicitacoes. Rode \"Login\" primeiro: ele guarda o token na variável {{token}}. \"Criar solicitação\" guarda o id em {{solicitacaoId}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "token", "value": "" },
+    { "key": "solicitacaoId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.collectionVariables.set('token', pm.response.json().token);"] }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "url": "{{baseUrl}}/sessoes",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"teste@exemplo.com\",\n  \"senha\": \"senha-forte-123\"\n}" }
+      }
+    },
+    {
+      "name": "Criar solicitação (texto livre)",
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.collectionVariables.set('solicitacaoId', pm.response.json().id);"] }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/solicitacoes",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"texto\": \"arroz 5kg, 2 leites integrais e detergente\"\n}" }
+      }
+    },
+    {
+      "name": "Criar solicitação (itens)",
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.collectionVariables.set('solicitacaoId', pm.response.json().id);"] }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/solicitacoes",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"itens\": [\n    { \"descricao\": \"café 500g\", \"quantidade\": 2 },\n    { \"descricao\": \"papel higiênico\", \"quantidade\": 1 }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Listar solicitações",
+      "request": { "method": "GET", "url": "{{baseUrl}}/solicitacoes" }
+    },
+    {
+      "name": "Obter solicitação",
+      "request": { "method": "GET", "url": "{{baseUrl}}/solicitacoes/{{solicitacaoId}}" }
+    },
+    {
+      "name": "Cancelar solicitação",
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/solicitacoes/{{solicitacaoId}}" }
+    }
+  ]
+}
