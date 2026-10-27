@@ -33,12 +33,12 @@ def test_metodo_nao_permitido_responde_405_em_json(client):
     assert "erro" in resposta.json
 
 
-def test_erro_inesperado_responde_500_sem_vazar_detalhes(app, client):
+def test_erro_inesperado_responde_500_sem_vazar_detalhes(app, client, auth):
     @app.get("/explode")
     def explode():
         raise ValueError("detalhe interno")
 
-    resposta = client.get("/explode")
+    resposta = client.get("/explode", headers=auth)
 
     assert resposta.status_code == 500
     assert resposta.json == {"erro": "Erro interno do servidor."}

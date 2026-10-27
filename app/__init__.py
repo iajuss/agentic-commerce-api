@@ -1,8 +1,8 @@
 """App factory da API do Agentic Commerce."""
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, verify_jwt_in_request
 
 from app.auditoria.rotas import bp as auditoria_bp
 from app.autenticacao.rotas import bp as autenticacao_bp
@@ -41,6 +41,13 @@ def create_app(config=None, cliente_mongo=None):
     CORS(app, origins=app.config["CORS_ORIGINS"], expose_headers=["Location"])
     registrar_tratadores(app, JWTManager(app))
     iniciar_banco(app, cliente_mongo)
+
+    @app.before_request
+    def proteger_rotas():
+        # Um endpoint novo também fica protegido, mesmo sem @jwt_required().
+        publicas = {"saude.health", "autenticacao.cadastrar_usuario", "autenticacao.criar_sessao"}
+        if request.method != "OPTIONS" and request.endpoint is not None and request.endpoint not in publicas:
+            verify_jwt_in_request()
 
     for blueprint in BLUEPRINTS:
         app.register_blueprint(blueprint)
