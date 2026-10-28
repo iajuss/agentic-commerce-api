@@ -29,6 +29,7 @@ OFERTAS = [
     oferta("D1", "Detergente Neutro 500ml", 2.49, "Detergente", ["Casa e Limpeza", "Detergente"],
            loja="Super Econômico", frete=None, frete_gratis=False),
 ]
+OVOS = oferta("O12", "Ovos Brancos 12 Unidades", 11.90, "Ovos", ["Alimentos e Bebidas", "Ovos"])
 
 
 @pytest.fixture(autouse=True)
@@ -110,6 +111,34 @@ def test_texto_com_embalagens_e_medidas_encontra_as_ofertas(client, auth):
     corpo = solicitar(client, auth, texto="duas caixas de leite, 2 kg de feijão e três pacotes de arroz").json
 
     assert [item["status"] for item in corpo["itens"]] == ["com_oferta"] * 3
+
+
+def test_quantidade_completa_a_medida_pedida(client, auth):
+    corpo = solicitar(client, auth, texto="2 kg de feijão").json
+
+    (item,) = corpo["itens"]
+    assert item["recomendada"]["id_externo"] == "F1"
+    assert item["quantidade"] == 2
+    assert "Você pediu 2 kg: 2 embalagens de 1 kg" in item["explicacao"]
+    assert corpo["cesta"]["subtotal"] == 17.98
+
+
+def test_quantidade_conta_os_ovos_da_caixa_a_nao_ser_que_o_pedido_seja_de_caixas(app, client, auth):
+    app.extensions["catalogo"] = CatalogoFixo([OVOS])
+
+    itens = solicitar(client, auth, texto="dez ovos; 2 caixas de ovos").json["itens"]
+
+    assert [item["quantidade"] for item in itens] == [1, 2]
+
+
+def test_politica_avalia_as_embalagens_que_serao_compradas(app, client, auth):
+    app.extensions["catalogo"] = CatalogoFixo([OVOS])
+    criar_politica(client, auth, teto_por_compra=20)
+
+    item = solicitar(client, auth, texto="dez ovos").json["itens"][0]
+
+    assert item["status"] == "com_oferta"
+    assert item["quantidade"] == 1
 
 
 def test_nenhum_item_com_oferta_gera_sem_resultado(client, auth):

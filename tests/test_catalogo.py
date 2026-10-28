@@ -64,6 +64,7 @@ def test_medidas_nao_restringem_a_busca(catalogo):
     ("pacotes de café", "café"),
     ("garrafas de refrigerante", "refrigerante"),
     ("dúzias de ovos", "ovos"),
+    ("meia dúzia de ovos", "ovos"),
     ("2 kg de feijão", "feijão"),
     ("leite 1 litro", "leite"),
     ("café 500 g", "café"),
@@ -75,6 +76,10 @@ def test_embalagens_e_medidas_separadas_do_numero_nao_restringem_a_busca(catalog
 
     assert esperadas
     assert [oferta["id_externo"] for oferta in catalogo.buscar(termo)] == esperadas
+
+
+def test_pack_restringe_a_busca_aos_pacotes_com_varios_itens(catalogo):
+    assert [oferta["id_externo"] for oferta in catalogo.buscar("pack de água")] == ["FIXO-043"]
 
 
 @pytest.mark.parametrize("termo", ["xyzw", "5kg", "de com"])

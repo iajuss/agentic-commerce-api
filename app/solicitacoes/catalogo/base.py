@@ -13,10 +13,12 @@ CAMPOS_OPCIONAIS = ("marca", "frete", "frete_gratis", "prazo_dias", "avaliacao",
 # comparação é feita depois do radical ("caixas" -> "caixa").
 PALAVRAS_IGNORADAS = frozenset({
     "a", "o", "e", "de", "da", "do", "das", "dos", "em", "com", "sem", "para", "tipo",
-    # embalagens ("duas caixas de leite" procura leite)
-    "pacote", "caixa", "garrafa", "frasco", "pote", "saco", "bandeja", "fardo", "kit", "embalagem", "duzia",
-    # medidas escritas separadas do número ("2 kg de feijão", "leite 1 litro", "6 x 350ml")
+    # embalagens ("duas caixas de leite" procura leite); "kit", "fardo" e "pack" ficam de fora porque pedem um
+    # pacote com vários itens, e sem eles a busca recomendaria a unidade avulsa
+    "pacote", "caixa", "garrafa", "frasco", "pote", "saco", "bandeja", "embalagem",
+    # medidas escritas separadas do número ("2 kg de feijão", "leite 1 litro", "6 x 350ml", "meia dúzia")
     "x", "kg", "quilo", "kilo", "g", "grama", "ml", "l", "lt", "litro", "un", "und", "unid", "unidade", "rolo",
+    "duzia", "meia",
 })
 
 # Tokens de medida ("5kg", "500g", "1,5l", "12x350ml", "12") não restringem a busca; o ranking cuida da
