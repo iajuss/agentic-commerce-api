@@ -1,13 +1,18 @@
 """Ranking explicável das ofertas de um item da lista de compras.
 
-Cada critério vira uma nota de 0 a 1 (critério ausente = nota neutra):
+Cada critério vira uma nota de 0 a 1:
 - preço: proporcional ao menor preço do conjunto (menor / preço), para que centavos de diferença não pesem
-  como a escala inteira;
-- frete e prazo: posição entre o menor e o maior valor do conjunto;
-- avaliação: nota da loja dividida por 5.
+  como a escala inteira; é o preço por kg/L/un quando todas as ofertas têm a mesma unidade, senão o preço;
+- frete e prazo: posição entre o menor e o maior valor do conjunto; frete não informado conta como
+  FRETE_ESTIMADO, o mesmo valor que a cesta cobra, e prazo não informado recebe a nota neutra;
+- avaliação: nota da loja dividida por 5 (sem avaliação, nota neutra), para que 4,1 contra 4,8 não vire
+  0 contra 1.
 
-A pontuação é a soma ponderada das notas, mais os bônus de marca e de embalagem. A explicação traz as
-frases que o front mostra.
+A pontuação é a soma ponderada das notas, mais os bônus de marca e de embalagem igual à pedida. A explicação
+traz as frases que o front mostra.
+
+Desvios do plano (M2-06), escolhidos de propósito: a normalização do preço e da avaliação acima, o frete
+estimado em vez da nota neutra e o BONUS_EMBALAGEM_PEDIDA, que o plano não previa.
 """
 
 from app.solicitacoes.medidas import NOMES_EXIBIDOS, extrair_medida, formatar_medida

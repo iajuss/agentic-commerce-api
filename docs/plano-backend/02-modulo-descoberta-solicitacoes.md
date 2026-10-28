@@ -86,7 +86,7 @@ Branch `feat/m2-catalogo` · Quarta
 - "feijao" encontra feijão;
 - termo desconhecido → lista vazia.
 **Aceite:**
-- [ ] Com `CATALOGO_PROVEDOR=fixo`, tudo funciona sem rede nem credencial.
+- [x] Com `CATALOGO_PROVEDOR=fixo`, tudo funciona sem rede nem credencial.
 
 ## M2-03 — Conector do catálogo externo
 Branch `feat/m2-catalogo-externo` · Quarta à tarde e quinta · Rubrica: API externa
@@ -241,5 +241,5 @@ registrados no próprio teste:
 `solicitacaoId` como variável da coleção.
 
 **Aceite:**
-- [ ] Suíte inteira verde, sem rede.
+- [x] Suíte inteira verde, sem rede.
 - [ ] O documento gravado bate campo a campo com a seção 4 do contrato.
