@@ -1,7 +1,9 @@
 """Catálogo de ofertas: contrato da oferta, catálogo fixo e escolha do provedor."""
 
+import mongomock
 import pytest
 
+from app import create_app
 from app.solicitacoes.catalogo import obter_catalogo
 from app.solicitacoes.catalogo.base import nova_oferta, palavras_relevantes, validar_oferta
 from app.solicitacoes.catalogo.fixo import CatalogoFixo
@@ -136,3 +138,20 @@ def test_provedor_indisponivel_explica_o_problema(app):
 
     with app.app_context(), pytest.raises(RuntimeError, match="CATALOGO_PROVEDOR=inexistente"):
         obter_catalogo()
+
+
+def criar_app_com_provedor(provedor):
+    config = {"TESTING": True, "JWT_SECRET_KEY": "chave-so-para-testes-com-32-caracteres",
+              "CATALOGO_PROVEDOR": provedor}
+    return create_app(config, cliente_mongo=mongomock.MongoClient(tz_aware=True))
+
+
+@pytest.mark.parametrize("provedor", ["mercadolivre", "inexistente"])
+def test_provedor_sem_conector_impede_a_api_de_subir(provedor):
+    with pytest.raises(RuntimeError, match=f"CATALOGO_PROVEDOR={provedor} não está disponível"):
+        criar_app_com_provedor(provedor)
+
+
+@pytest.mark.parametrize("provedor", ["fixo", "dummyjson", ""])
+def test_provedor_com_conector_ou_vazio_deixa_a_api_subir(provedor):
+    assert "solicitacoes" in criar_app_com_provedor(provedor).blueprints
