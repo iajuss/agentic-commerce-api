@@ -109,7 +109,7 @@ decrescente).
       "descricao": "arroz 5kg", "quantidade": 1, "status": "com_oferta",
       "recomendada": {
         "id_externo": "MLB123", "fonte": "mercadolivre", "titulo": "Arroz Branco Tipo 1 5kg",
-        "preco": 27.9, "frete": 0.0, "frete_gratis": true, "prazo_dias": 2,
+        "marca": "Marca Exemplo", "preco": 27.9, "frete": 0.0, "frete_gratis": true, "prazo_dias": 2, "estoque": 50,
         "categoria": "Arroz", "categorias_caminho": ["Alimentos e Bebidas", "Arroz"], "loja": "Loja Exemplo",
         "avaliacao": 4.7, "preco_por_unidade": 5.58, "unidade": "kg", "link": "https://...", "imagem": "https://...",
         "pontuacao": 0.91, "explicacao": ["Menor preço por kg entre 6 ofertas: R$ 5,58/kg", "Frete grátis"]
@@ -131,7 +131,13 @@ decrescente).
   `itens[].recomendada.{id_externo, titulo, preco, frete, loja}`, `cesta.{total, lojas}` e
   `avaliacao.{permitida, compra_automatica, politica_id, motivos}`. O M2 não pode renomear nem mudar o tipo deles.
 - Oferta: os campos obrigatórios são `id_externo`, `fonte`, `titulo`, `preco`, `categoria`, `categorias_caminho` e
-  `loja`; os demais podem ser `null` quando a fonte não informa.
+  `loja`; os demais podem ser `null` quando a fonte não informa. `marca` alimenta as marcas preferidas e evitadas do
+  perfil; `estoque` é a quantidade disponível (aproximada quando a fonte só informa faixas).
+- `texto` é `null` quando a solicitação chega com `itens` já separados.
+- `itens[].quantidade` é o número de embalagens da `recomendada` a comprar, o mesmo que entra em `cesta.subtotal`.
+  O M2 ajusta a quantidade pedida ao tamanho da embalagem: "2 kg de feijão" com a oferta de 1 kg vira
+  `quantidade: 2`, e "Dez ovos" com a caixa de 12 vira `quantidade: 1`. A explicação do item conta o ajuste
+  ("Você pediu 2 kg: 2 embalagens de 1 kg").
 - Item `sem_oferta` tem `recomendada: null` e fica fora da cesta. `cesta.total` = `subtotal` + `frete`.
 - `avaliacao` é calculada pelo M2 sobre a cesta inteira; o M3 confia nela (não reavalia políticas no MVP).
 - `compra_automatica` é escrito pelo M2 com o retorno do gancho da seção 6.2 (ou `null`).
@@ -256,15 +262,24 @@ O M1 carrega todas as chaves em `app/config.py` (M1-01), lendo do `.env` e conve
 | Data | Mudança | Aprovada por |
 |---|---|---|
 | 27/10/2026 | Versão inicial do contrato do MVP | — |
+| 27/10/2026 | Seção 4: oferta com `marca` e `estoque`, `texto` nulo quando vierem `itens` e `itens[].quantidade` = embalagens a comprar. Seção 10: corpo de `POST /solicitacoes` e resumo de `GET /solicitacoes` | pendente (3 devs) |
 
 ## 10. Exemplos de resposta para o front
 
 Ids são texto e datas vêm em ISO 8601 (`app/json.py`). Erro, em qualquer rota:
 `{"erro": "Política inválida.", "detalhes": {"teto_por_compra": "Informe um valor maior que zero."}}`.
 
+`POST /solicitacoes` recebe **exatamente um** de `{"texto": "arroz 5kg, 2 leites e detergente"}` (3 a 500
+caracteres) ou `{"itens": [{"descricao": "arroz 5kg", "quantidade": 1}]}` (1 a 20 itens; `quantidade` inteira de 1 a
+99, padrão 1). Corpo inválido responde `400` com o problema de cada campo em `detalhes`.
+
 `POST /solicitacoes` (`201`, `Location: /solicitacoes/<id>`): o documento da seção 4 com `id` no lugar de `_id`.
 Quando a compra automática acontece, vem `status: "aprovada"` e
 `"compra_automatica": {"autorizacao_id": "...", "pedido_id": "..."}`.
+
+`GET /solicitacoes` (`200`): o resumo de cada solicitação, das mais recentes para as mais antigas:
+`[{"id", "texto", "itens": ["arroz 5kg", "leites"], "status", "total", "criada_em"}]`, em que `itens` são as
+descrições e `total` é o `cesta.total`. O documento completo vem em `GET /solicitacoes/<solicitacao_id>`.
 
 `POST /pedidos` (`201`, `Location: /pedidos/<id>`):
 
