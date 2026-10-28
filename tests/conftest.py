@@ -2,6 +2,7 @@
 
 import mongomock
 import pytest
+import requests
 from bson import ObjectId
 from flask_jwt_extended import create_access_token
 
@@ -35,3 +36,13 @@ def cabecalho_de(app):
 def auth(cabecalho_de):
     """Cabeçalho de um usuário qualquer, para testes com um só usuário."""
     return cabecalho_de(ObjectId())
+
+
+@pytest.fixture(autouse=True)
+def bloquear_http_real(monkeypatch):
+    """Impede que qualquer teste faça uma chamada HTTP externa sem mock."""
+
+    def recusar_requisicao(*args, **kwargs):
+        raise RuntimeError("Chamada HTTP real em teste: mocke o adaptador.")
+
+    monkeypatch.setattr(requests.sessions.Session, "request", recusar_requisicao)
