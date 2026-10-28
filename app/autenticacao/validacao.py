@@ -1,4 +1,4 @@
-"""Validação dos campos editáveis do perfil."""
+"""Validação de cadastro, login e campos editáveis do perfil."""
 
 import math
 import re
@@ -8,6 +8,37 @@ from app.erros import ErroApi
 
 FORMATO_DATA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CAMPOS_DE_MARCAS = ("marcas_preferidas", "marcas_evitadas")
+EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def validar_cadastro(dados):
+    erros = {}
+
+    nome = dados.get("nome")
+    if not isinstance(nome, str) or not nome.strip() or len(nome.strip()) > 80:
+        erros["nome"] = "Informe um nome de até 80 caracteres."
+
+    email = dados.get("email")
+    if not isinstance(email, str) or len(email.strip()) > 254 or not EMAIL.fullmatch(email.strip()):
+        erros["email"] = "Informe um e-mail válido."
+
+    senha = dados.get("senha")
+    if not isinstance(senha, str) or not 8 <= len(senha) <= 128:
+        erros["senha"] = "Use uma senha de 8 a 128 caracteres."
+
+    if erros:
+        raise ErroApi(400, "Dados de cadastro inválidos.", erros)
+
+    return nome.strip(), email.strip().lower(), senha
+
+
+def validar_login(dados):
+    email = dados.get("email")
+    senha = dados.get("senha")
+    if not isinstance(email, str) or not isinstance(senha, str):
+        raise ErroApi(401, "E-mail ou senha inválidos.")
+
+    return email.strip().lower(), senha
 
 
 def _data_no_passado(valor):

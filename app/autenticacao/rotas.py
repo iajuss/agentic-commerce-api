@@ -3,8 +3,6 @@
 Responsável: Pessoa 2 (cadastro e login) e Pessoa 3 (perfil com ViaCEP).
 """
 
-import re
-
 from flask import Blueprint, jsonify
 from flask_jwt_extended import create_access_token
 from pymongo.errors import DuplicateKeyError
@@ -13,14 +11,14 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app.auditoria.registro import registrar_evento
 from app.autenticacao import repositorio
 from app.autenticacao.identidade import usuario_atual_id
-from app.autenticacao.validacao import validar_perfil
+from app.autenticacao.validacao import validar_cadastro, validar_login, validar_perfil
 from app.autenticacao.viacep import consultar_cep
 from app.erros import ErroApi, ler_json
 
 bp = Blueprint("autenticacao", __name__)
 
-EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CAMPOS_ENDERECO = ("cep", "logradouro", "numero", "complemento", "bairro", "cidade", "uf")
+HASH_SENHA_FICTICIA = generate_password_hash("senha-ficticia")
 
 
 def _usuario_publico(usuario):
@@ -29,26 +27,10 @@ def _usuario_publico(usuario):
 
 @bp.post("/usuarios")
 def cadastrar_usuario():
-    dados = ler_json()
-    erros = {}
-
-    nome = dados.get("nome")
-    if not isinstance(nome, str) or not nome.strip() or len(nome.strip()) > 80:
-        erros["nome"] = "Informe um nome de até 80 caracteres."
-
-    email = dados.get("email")
-    if not isinstance(email, str) or len(email.strip()) > 254 or not EMAIL.fullmatch(email.strip()):
-        erros["email"] = "Informe um e-mail válido."
-
-    senha = dados.get("senha")
-    if not isinstance(senha, str) or not 8 <= len(senha) <= 128:
-        erros["senha"] = "Use uma senha de 8 a 128 caracteres."
-
-    if erros:
-        raise ErroApi(400, "Dados de cadastro inválidos.", erros)
+    nome, email, senha = validar_cadastro(ler_json())
 
     try:
-        usuario = repositorio.criar(nome.strip(), email.strip().lower(), generate_password_hash(senha))
+        usuario = repositorio.criar(nome, email, generate_password_hash(senha))
     except DuplicateKeyError:
         raise ErroApi(409, "E-mail já cadastrado.", {"email": "Use outro e-mail."}) from None
 
@@ -58,14 +40,11 @@ def cadastrar_usuario():
 
 @bp.post("/sessoes")
 def criar_sessao():
-    dados = ler_json()
-    email = dados.get("email")
-    senha = dados.get("senha")
-    if not isinstance(email, str) or not isinstance(senha, str):
-        raise ErroApi(401, "E-mail ou senha inválidos.")
-
-    usuario = repositorio.buscar_por_email(email.strip().lower())
-    if usuario is None or not check_password_hash(usuario["senha_hash"], senha):
+    email, senha = validar_login(ler_json())
+    usuario = repositorio.buscar_por_email(email)
+    hash_senha = usuario["senha_hash"] if usuario is not None else HASH_SENHA_FICTICIA
+    senha_correta = check_password_hash(hash_senha, senha)
+    if usuario is None or not senha_correta:
         if usuario is not None:
             registrar_evento(usuario["_id"], "login_recusado", "usuario", usuario["_id"])
         raise ErroApi(401, "E-mail ou senha inválidos.")
