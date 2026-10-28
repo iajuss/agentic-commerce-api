@@ -121,7 +121,7 @@ Branch `feat/m2-catalogo-externo` · Quarta à tarde e quinta · Rubrica: API ex
 `validar_oferta`. Na opção A/B, cobrir a renovação de token (vencido → renova → grava o novo `refresh_token`) e o
 `401` com uma única nova tentativa.
 **Aceite:**
-- [ ] Com o provedor externo configurado, `POST /solicitacoes` traz ofertas reais (checagem manual registrada no PR).
+- [x] Com o provedor externo configurado, `POST /solicitacoes` traz ofertas reais (checagem manual registrada no PR).
 
 ## M2-04 — Políticas da cesta
 Branch `feat/m2-politicas-cesta` · Quinta · Arquivo: `app/politicas/regras.py`
@@ -242,4 +242,4 @@ registrados no próprio teste:
 
 **Aceite:**
 - [x] Suíte inteira verde, sem rede.
-- [ ] O documento gravado bate campo a campo com a seção 4 do contrato.
+- [x] O documento gravado bate campo a campo com a seção 4 do contrato.
