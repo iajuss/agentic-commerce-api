@@ -9,10 +9,14 @@ import unicodedata
 CAMPOS_OBRIGATORIOS = ("id_externo", "fonte", "titulo", "preco", "categoria", "categorias_caminho", "loja")
 CAMPOS_OPCIONAIS = ("marca", "frete", "frete_gratis", "prazo_dias", "avaliacao", "estoque", "link", "imagem")
 
-# Palavras que não identificam o produto e ficam fora da comparação da busca.
+# Palavras que não identificam o produto e ficam fora da comparação da busca. Ficam no singular, porque a
+# comparação é feita depois do radical ("caixas" -> "caixa").
 PALAVRAS_IGNORADAS = frozenset({
     "a", "o", "e", "de", "da", "do", "das", "dos", "em", "com", "sem", "para", "tipo",
-    "pacote", "caixa", "garrafa", "kit", "unidade", "un", "und",
+    # embalagens ("duas caixas de leite" procura leite)
+    "pacote", "caixa", "garrafa", "frasco", "pote", "saco", "bandeja", "fardo", "kit", "embalagem", "duzia",
+    # medidas escritas separadas do número ("2 kg de feijão", "leite 1 litro", "6 x 350ml")
+    "x", "kg", "quilo", "kilo", "g", "grama", "ml", "l", "lt", "litro", "un", "und", "unid", "unidade", "rolo",
 })
 
 # Tokens de medida ("5kg", "500g", "1,5l", "12x350ml", "12") não restringem a busca; o ranking cuida da
@@ -70,4 +74,4 @@ def radical(palavra):
 def palavras_relevantes(texto):
     """Radicais das palavras que identificam o produto, sem medidas nem palavras ignoradas."""
     tokens = TOKEN.findall(sem_acentos(texto))
-    return {radical(token) for token in tokens if token not in PALAVRAS_IGNORADAS and not MEDIDA.match(token)}
+    return {radical(token) for token in tokens if not MEDIDA.match(token)} - PALAVRAS_IGNORADAS

@@ -57,6 +57,24 @@ def test_medidas_nao_restringem_a_busca(catalogo):
     assert com_medida == {oferta["id_externo"] for oferta in catalogo.buscar("arroz")}
 
 
+@pytest.mark.parametrize("termo, produto", [
+    ("caixas de leite", "leite"),
+    ("pacotes de café", "café"),
+    ("garrafas de refrigerante", "refrigerante"),
+    ("dúzias de ovos", "ovos"),
+    ("2 kg de feijão", "feijão"),
+    ("leite 1 litro", "leite"),
+    ("café 500 g", "café"),
+    ("500 gramas de café", "café"),
+    ("refrigerante 6 x 350ml", "refrigerante"),
+])
+def test_embalagens_e_medidas_separadas_do_numero_nao_restringem_a_busca(catalogo, termo, produto):
+    esperadas = [oferta["id_externo"] for oferta in catalogo.buscar(produto)]
+
+    assert esperadas
+    assert [oferta["id_externo"] for oferta in catalogo.buscar(termo)] == esperadas
+
+
 @pytest.mark.parametrize("termo", ["xyzw", "5kg", "de com"])
 def test_termo_sem_produto_conhecido_devolve_lista_vazia(catalogo, termo):
     assert catalogo.buscar(termo) == []
@@ -80,6 +98,10 @@ def test_catalogo_aceita_ofertas_informadas():
 
 def test_palavras_relevantes_usa_radical_e_ignora_medidas():
     assert palavras_relevantes("2 Leites Integrais de 1L") == {"leite", "integral"}
+
+
+def test_palavras_ignoradas_valem_tambem_no_plural():
+    assert palavras_relevantes("3 Pacotes de Café 500 g") == {"cafe"}
 
 
 @pytest.mark.parametrize("campo, valor", [("preco", None), ("preco", 0), ("preco", True), ("loja", ""),

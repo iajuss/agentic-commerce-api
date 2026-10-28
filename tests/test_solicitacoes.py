@@ -106,6 +106,12 @@ def test_texto_e_itens_equivalentes_geram_a_mesma_cesta(client, auth):
     assert por_texto["cesta"] == por_itens["cesta"]
 
 
+def test_texto_com_embalagens_e_medidas_encontra_as_ofertas(client, auth):
+    corpo = solicitar(client, auth, texto="duas caixas de leite, 2 kg de feijão e três pacotes de arroz").json
+
+    assert [item["status"] for item in corpo["itens"]] == ["com_oferta"] * 3
+
+
 def test_nenhum_item_com_oferta_gera_sem_resultado(client, auth):
     resposta = solicitar(client, auth, ("chocolate", 1))
 
