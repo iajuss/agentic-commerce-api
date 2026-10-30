@@ -72,13 +72,27 @@ def test_proxy_fix_inclui_prefixo_no_location():
     assert resposta.headers["Location"] == f"/api/politicas/{resposta.json['id']}"
 
 
-def test_provedor_desconhecido_impede_inicializacao():
+def test_provedor_combinado_permite_inicializacao():
+    app = create_app(
+        {
+            "TESTING": True,
+            "JWT_SECRET_KEY": "chave-de-teste-com-pelo-menos-32-caracteres",
+            "CATALOGO_PROVEDOR": "combinado",
+        },
+        cliente_mongo=mongomock.MongoClient(tz_aware=True),
+    )
+
+    assert app.config["CATALOGO_PROVEDOR"] == "combinado"
+
+
+@pytest.mark.parametrize("provedor", ["desconhecido", "mercadolivre"])
+def test_provedor_sem_suporte_impede_inicializacao(provedor):
     with pytest.raises(RuntimeError, match="CATALOGO_PROVEDOR"):
         create_app(
             {
                 "TESTING": True,
                 "JWT_SECRET_KEY": "chave-de-teste-com-pelo-menos-32-caracteres",
-                "CATALOGO_PROVEDOR": "desconhecido",
+                "CATALOGO_PROVEDOR": provedor,
             },
             cliente_mongo=mongomock.MongoClient(tz_aware=True),
         )

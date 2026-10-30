@@ -15,6 +15,7 @@ from app.pagamento.rotas import bp as pagamento_bp
 from app.politicas.rotas import bp as politicas_bp
 from app.pos_compra.rotas import bp as pos_compra_bp
 from app.saude import bp as saude_bp
+from app.solicitacoes.catalogo import fabrica_do_provedor
 from app.solicitacoes.rotas import bp as solicitacoes_bp
 
 # Um blueprint por módulo do diagrama de pacotes.
@@ -38,8 +39,7 @@ def create_app(config=None, cliente_mongo=None):
     app.config.from_object(Config)
     app.config.update(config or {})
 
-    if app.config["CATALOGO_PROVEDOR"] not in {"fixo", "mercadolivre", "dummyjson"}:
-        raise RuntimeError("CATALOGO_PROVEDOR deve ser fixo, mercadolivre ou dummyjson.")
+    fabrica_do_provedor(app.config)
 
     if app.config["PROXY_FIX"]:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)

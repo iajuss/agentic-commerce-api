@@ -80,6 +80,15 @@ avaliacao.motivos            # por que as políticas recusaram (para a explicaç
 A oferta precisa de `preco`, `categoria` e `loja`; `frete` é opcional e entra no teto.
 Sem nenhuma política ativa, tudo é permitido, mas sempre com aprovação manual.
 
+## APIs externas e limitações do MVP
+
+Na EC2, configure `CATALOGO_PROVEDOR=combinado`. Ele reúne ofertas locais
+(`fixo`) e produtos da API externa DummyJSON no mesmo ranking. O padrão
+`fixo` funciona sem acesso à API externa no desenvolvimento local.
+
+O Mercado Livre não integra o catálogo do MVP. As credenciais `ML_*` ficam
+vazias; o sistema não consulta ofertas nem conclui compras nessa plataforma.
+
 ## Coleção de requisições
 
 `docs/agentic-commerce.postman_collection.json` (importa no Postman ou no Insomnia).
