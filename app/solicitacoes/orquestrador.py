@@ -13,7 +13,7 @@ from flask import current_app
 from app.erros import ErroApi
 from app.politicas.regras import avaliar_cesta, avaliar_oferta
 from app.solicitacoes.catalogo.base import sem_acentos
-from app.solicitacoes.medidas import embalagens_necessarias, extrair_medida
+from app.solicitacoes.medidas import embalagens_necessarias
 from app.solicitacoes.ranking import FRETE_ESTIMADO, ranquear
 
 COM_OFERTA = "com_oferta"
@@ -134,7 +134,7 @@ def _processar_item(item, ofertas, politicas, preferencias, maior_de_idade):
             explicacao.append("Nenhuma oferta permitida para este item")
         return _item_sem_oferta(item, explicacao, descartadas=len(ofertas))
 
-    ranqueadas = ranquear(permitidas, preferencias, medida_pedida=extrair_medida(item["descricao"]))
+    ranqueadas = ranquear(permitidas, preferencias, quantidade=item["quantidade"], descricao=item["descricao"])
     # A quantidade gravada é o número de embalagens da recomendada, que o M3 multiplica pelo preço.
     quantidade, ajuste = embalagens_necessarias(item["quantidade"], item["descricao"], ranqueadas[0]["titulo"])
     if ajuste:
