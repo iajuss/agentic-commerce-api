@@ -29,7 +29,8 @@ def inserir_usuario(app, senha=SENHA_PADRAO):
             "_id": usuario_id,
             "nome": "Cliente Teste",
             "email": f"cliente-{usuario_id}@exemplo.com",
-            "senha_hash": generate_password_hash(senha),
+            # Hash barato só para a suíte ficar rápida; check_password_hash lê o método do próprio hash.
+            "senha_hash": generate_password_hash(senha, method="pbkdf2:sha256:1000"),
             "criado_em": _agora(),
         })
     return usuario_id

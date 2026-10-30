@@ -10,9 +10,9 @@ from werkzeug.security import check_password_hash
 from app.autenticacao.identidade import usuario_atual_id
 from app.banco import documento_para_json, para_object_id
 from app.erros import ErroApi, ler_json
-from app.pagamento import regras, repositorio_autorizacoes, repositorio_contrato, servicos
+from app.pagamento import regras, repositorio_autorizacoes, repositorio_contrato, repositorio_pedidos, servicos
 from app.pagamento.auditoria import auditar
-from app.pagamento.validacao import validar_aprovacao
+from app.pagamento.validacao import validar_aprovacao, validar_pagamento_simulado, validar_pedido
 
 bp = Blueprint("pagamento", __name__)
 
@@ -67,3 +67,29 @@ def obter_autorizacao(autorizacao_id):
 def revogar_autorizacao(autorizacao_id):
     servicos.revogar_autorizacao(usuario_atual_id(), para_object_id(autorizacao_id))
     return "", 204
+
+
+@bp.post("/pedidos")
+@jwt_required()
+def criar_pedido():
+    autorizacao_id = para_object_id(validar_pedido(ler_json()))
+    usuario_id = usuario_atual_id()
+    autorizacao = servicos.consumir_autorizacao(usuario_id, autorizacao_id)
+    pedido = servicos.criar_pedido(usuario_id, autorizacao)
+    local = url_for("pos_compra.obter_pedido", pedido_id=str(pedido["_id"]))
+    return jsonify(regras.pedido_para_json(pedido)), 201, {"Location": local}
+
+
+@bp.get("/pedidos")
+@jwt_required()
+def listar_pedidos():
+    pedidos = repositorio_pedidos.listar(usuario_atual_id())
+    return jsonify([regras.resumo_do_pedido(pedido) for pedido in pedidos])
+
+
+@bp.post("/simulador-pix/pagamentos")
+@jwt_required()
+def simular_pagamento_pix():
+    txid = validar_pagamento_simulado(ler_json())
+    pedido = servicos.confirmar_pagamento(usuario_atual_id(), txid)
+    return jsonify(regras.pedido_para_json(pedido))

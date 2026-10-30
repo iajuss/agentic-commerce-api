@@ -100,3 +100,4 @@ def test_agora_dos_dois_modulos_e_utc():
         momento = modulo.agora()
         assert isinstance(momento, datetime)
         assert momento.utcoffset() == timedelta(0)
+        assert momento.microsecond % 1000 == 0  # mesma precisão do BSON
