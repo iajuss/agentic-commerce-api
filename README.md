@@ -151,11 +151,16 @@ dinheiro nem conclui compra no Mercado Livre.
 ## Coleção de requisições
 
 `docs/agentic-commerce.postman_collection.json` (importa no Postman ou no Insomnia).
-A coleção reúne as 27 rotas em pastas por módulo. Rode Cadastro e Login primeiro:
-o token fica guardado para as outras requisições. `baseUrl` começa em
+A coleção cobre as 27 rotas em pastas por módulo e cria recursos de teste
+separados para revogação, cancelamento e devolução. Cadastro e Login guardam
+o token para as requisições seguintes. `baseUrl` começa em
 `http://localhost:5000`; troque pelo endereço de produção quando existir.
-Revogação, cancelamento e devolução são caminhos alternativos: use novos
-recursos para cada um.
+
+Para executar a coleção inteira, use o Runner com intervalo de 5 segundos
+entre requisições: ele consulta o pedido até a entrega simulada, por até
+nove minutos. Com as simulações zeradas apenas no ambiente local, o
+intervalo pode ser menor. A execução cria contas e pedidos de teste no
+banco configurado.
 
 ## Ensaio ponta a ponta local
 
@@ -164,6 +169,10 @@ Com a API Flask em execução e o Atlas de desenvolvimento configurado, rode:
 ```bash
 python scripts/ensaio_ponta_a_ponta.py --base-url http://localhost:5000
 ```
+
+Para exercitar também o catálogo externo, inicie a API com
+`CATALOGO_PROVEDOR=dummyjson` no ambiente do processo; o padrão `fixo`
+usa ofertas locais.
 
 O ensaio cria duas contas de teste, consulta o ViaCEP pelo CEP `01001000`,
 percorre os fluxos automático e manual e aguarda a entrega simulada por até

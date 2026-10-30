@@ -1,6 +1,7 @@
 """Exercita os fluxos automático e manual contra uma API HTTP em execução."""
 
 import argparse
+import sys
 import time
 from uuid import uuid4
 
@@ -290,4 +291,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
     raise SystemExit(main())
