@@ -10,6 +10,7 @@ from flask_jwt_extended import create_access_token
 from pymongo.errors import DuplicateKeyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.auditoria.registro import registrar_evento
 from app.autenticacao import repositorio
 from app.erros import ErroApi, ler_json
 
@@ -47,6 +48,7 @@ def cadastrar_usuario():
     except DuplicateKeyError:
         raise ErroApi(409, "E-mail já cadastrado.", {"email": "Use outro e-mail."}) from None
 
+    registrar_evento(usuario["_id"], "usuario_cadastrado", "usuario", usuario["_id"])
     return jsonify(_usuario_publico(usuario)), 201, {"Location": "/usuarios/me"}
 
 
@@ -60,7 +62,10 @@ def criar_sessao():
 
     usuario = repositorio.buscar_por_email(email.strip().lower())
     if usuario is None or not check_password_hash(usuario["senha_hash"], senha):
+        if usuario is not None:
+            registrar_evento(usuario["_id"], "login_recusado", "usuario", usuario["_id"])
         raise ErroApi(401, "E-mail ou senha inválidos.")
 
     token = create_access_token(identity=str(usuario["_id"]))
+    registrar_evento(usuario["_id"], "sessao_iniciada", "usuario", usuario["_id"])
     return jsonify(token=token, usuario=_usuario_publico(usuario))
