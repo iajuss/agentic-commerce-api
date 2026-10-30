@@ -16,6 +16,8 @@ CANCELADO = "cancelado"
 DEVOLUCAO_SOLICITADA = "devolucao_solicitada"
 DEVOLVIDO = "devolvido"
 
+PRAZO_DEVOLUCAO_DIAS = 7  # direito de arrependimento (CDC, art. 49)
+
 # Estados do pedido (tabela do M3-04). As automáticas vêm de transicoes_devidas;
 # as demais, do simulador e do PATCH.
 TRANSICOES_PERMITIDAS = frozenset({
@@ -80,6 +82,12 @@ def momento_do_status(pedido, status):
     """Quando o pedido entrou pela última vez em `status`, pelo histórico; None se nunca entrou."""
     return next((registro["em"] for registro in reversed(pedido["historico"]) if registro["status"] == status),
                 None)
+
+
+def devolucao_no_prazo(pedido, agora):
+    """True se ainda não passaram 7 dias desde a entrega."""
+    entregue_em = momento_do_status(pedido, ENTREGUE)
+    return entregue_em is not None and agora <= entregue_em + timedelta(days=PRAZO_DEVOLUCAO_DIAS)
 
 
 def reembolso(pedido, momento):

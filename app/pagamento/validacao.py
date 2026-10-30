@@ -21,6 +21,21 @@ def validar_pagamento_simulado(corpo):
     return _texto_obrigatorio(corpo, "txid", "Pagamento inválido.", "Informe o txid da cobrança Pix.")
 
 
+def validar_mudanca_pedido(corpo):
+    """(status, motivo) de PATCH /pedidos/<id>, ou 400. Motivo só na devolução, de 3 a 300 caracteres."""
+    status = corpo.get("status")
+    if status == "cancelado":
+        return status, None
+    if status != "devolucao_solicitada":
+        raise ErroApi(400, "Mudança de pedido inválida.",
+                      {"status": "Use \"cancelado\" ou \"devolucao_solicitada\"."})
+    motivo = corpo.get("motivo")
+    motivo = motivo.strip() if isinstance(motivo, str) else ""
+    if not 3 <= len(motivo) <= 300:
+        raise ErroApi(400, "Mudança de pedido inválida.", {"motivo": "Informe o motivo, de 3 a 300 caracteres."})
+    return status, motivo
+
+
 def _texto_obrigatorio(corpo, campo, mensagem, problema):
     valor = corpo.get(campo)
     if not isinstance(valor, str) or not valor.strip():

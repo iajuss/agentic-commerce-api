@@ -71,8 +71,9 @@ def pedido_para_json(pedido):
     corpo = {"id": pedido["_id"], **{campo: pedido[campo] for campo in CAMPOS_DO_PEDIDO}}
     if pedido["status"] != AGUARDANDO_PAGAMENTO:
         corpo["pix"] = {"txid": pedido["pix"]["txid"], "pago_em": pedido["pix"]["pago_em"]}
-    if pedido.get("reembolso"):
-        corpo["reembolso"] = pedido["reembolso"]
+    for campo in ("reembolso", "devolucao"):
+        if pedido.get(campo):
+            corpo[campo] = pedido[campo]
     return corpo
 
 

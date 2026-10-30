@@ -126,6 +126,10 @@ def _ler(client, cabecalho, pedido):
     return resposta.get_json()
 
 
+def _patch(client, cabecalho, pedido, corpo):
+    return client.patch(f"/pedidos/{pedido['id']}", json=corpo, headers=cabecalho)
+
+
 def _status_da_solicitacao(app, solicitacao):
     return app.extensions["mongo"]["solicitacoes"].find_one({"_id": solicitacao["_id"]})["status"]
 
@@ -242,13 +246,7 @@ def test_devolucao_solicitada_vira_devolvido_com_reembolso(app, client, cabecalh
     _, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
     _pagar(client, cabecalho, pedido)
     relogio.avancar(minutes=10)
-    _ler(client, cabecalho, pedido)
-    # O PATCH de devolução chega no M3-05: marca a devolução direto no banco.
-    pedidos = app.extensions["mongo"]["pedidos"]
-    pedidos.update_one({"_id": ObjectId(pedido["id"])}, {
-        "$set": {"status": "devolucao_solicitada"},
-        "$push": {"historico": {"status": "devolucao_solicitada", "em": relogio.momento}},
-    })
+    _patch(client, cabecalho, pedido, {"status": "devolucao_solicitada", "motivo": "Veio errado"})
 
     relogio.avancar(minutes=4)
     assert "reembolso" not in _ler(client, cabecalho, pedido)
@@ -267,4 +265,148 @@ def test_pedido_de_outro_usuario_responde_404_sem_aplicar_transicoes(app, client
     relogio.avancar(minutes=30)
 
     assert client.get(f"/pedidos/{pedido['id']}", headers=cabecalho).status_code == 404
+    assert _status_da_solicitacao(app, solicitacao) == "aprovada"
+
+
+# PATCH /pedidos/<id>: cancelamento e devolução
+
+CANCELAR = {"status": "cancelado"}
+DEVOLVER = {"status": "devolucao_solicitada", "motivo": "Veio errado"}
+
+
+def _entregue(app, client, cabecalho, usuario_id, relogio):
+    solicitacao, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+    _pagar(client, cabecalho, pedido)
+    relogio.avancar(minutes=7)
+    return solicitacao, pedido
+
+
+def test_cancelar_pedido_aguardando_pagamento_expira_a_solicitacao(app, client, cabecalho, usuario_id, eventos):
+    solicitacao, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+    eventos.clear()
+
+    resposta = _patch(client, cabecalho, pedido, CANCELAR)
+
+    assert resposta.status_code == 200
+    assert resposta.get_json()["status"] == "cancelado"
+    assert "reembolso" not in resposta.get_json()
+    assert _status_da_solicitacao(app, solicitacao) == "expirada"
+    assert _tipos(eventos) == ["pedido_cancelado"]
+
+
+@pytest.mark.parametrize("minutos, status_antes", [(1, "pago"), (3, "enviado")])
+def test_cancelar_pedido_pago_ou_enviado_grava_reembolso(app, client, cabecalho, usuario_id, relogio, minutos,
+                                                         status_antes):
+    solicitacao, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+    _pagar(client, cabecalho, pedido)
+    relogio.avancar(minutes=minutos)
+
+    corpo = _patch(client, cabecalho, pedido, CANCELAR).get_json()
+
+    assert corpo["status"] == "cancelado"
+    assert [status for status, _ in _historico(corpo)][-2:] == [status_antes, "cancelado"]
+    assert corpo["reembolso"] == {"valor": 33.8, "status": "simulado", "em": relogio.momento.isoformat()}
+    assert _status_da_solicitacao(app, solicitacao) == "concluida"
+
+
+def test_pedir_devolucao_de_pedido_entregue(app, client, cabecalho, usuario_id, relogio, eventos):
+    _, pedido = _entregue(app, client, cabecalho, usuario_id, relogio)
+    _ler(client, cabecalho, pedido)
+    relogio.avancar(days=7)
+    eventos.clear()
+
+    resposta = _patch(client, cabecalho, pedido, {**DEVOLVER, "motivo": "  Veio errado  "})
+
+    assert resposta.status_code == 200
+    assert resposta.get_json()["status"] == "devolucao_solicitada"
+    assert resposta.get_json()["devolucao"] == {"motivo": "Veio errado"}
+    assert _ler(client, cabecalho, pedido)["devolucao"] == {"motivo": "Veio errado"}
+    assert _tipos(eventos) == ["devolucao_solicitada"]
+
+
+def test_devolucao_no_oitavo_dia_responde_409(app, client, cabecalho, usuario_id, relogio):
+    _, pedido = _entregue(app, client, cabecalho, usuario_id, relogio)
+    relogio.avancar(days=7, minutes=1)
+
+    resposta = _patch(client, cabecalho, pedido, DEVOLVER)
+
+    assert resposta.status_code == 409
+    assert resposta.get_json()["erro"] == "O prazo de 7 dias para devolução terminou."
+    assert _ler(client, cabecalho, pedido)["status"] == "entregue"
+
+
+def test_cancelar_pedido_entregue_responde_409_com_status_atual(app, client, cabecalho, usuario_id, relogio,
+                                                                eventos):
+    _, pedido = _entregue(app, client, cabecalho, usuario_id, relogio)
+    _ler(client, cabecalho, pedido)
+    eventos.clear()
+
+    resposta = _patch(client, cabecalho, pedido, CANCELAR)
+
+    assert resposta.status_code == 409
+    assert "entregue" in resposta.get_json()["erro"]
+    assert eventos == []
+
+
+def test_patch_aplica_transicoes_antes_de_decidir(app, client, cabecalho, usuario_id, relogio, eventos):
+    solicitacao, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+    relogio.avancar(minutes=30)
+    eventos.clear()
+
+    resposta = _patch(client, cabecalho, pedido, CANCELAR)
+
+    assert resposta.status_code == 409
+    assert "expirado" in resposta.get_json()["erro"]
+    assert _tipos(eventos) == ["pedido_expirado"]
+    assert _status_da_solicitacao(app, solicitacao) == "expirada"
+
+
+@pytest.mark.parametrize("corpo", [CANCELAR, DEVOLVER])
+def test_pedido_em_estado_final_nao_muda(app, client, cabecalho, usuario_id, corpo):
+    _, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+    assert _patch(client, cabecalho, pedido, CANCELAR).status_code == 200
+
+    resposta = _patch(client, cabecalho, pedido, corpo)
+
+    assert resposta.status_code == 409
+    assert len(_ler(client, cabecalho, pedido)["historico"]) == 2
+
+
+def test_devolucao_de_pedido_pago_responde_409(app, client, cabecalho, usuario_id):
+    _, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+    _pagar(client, cabecalho, pedido)
+
+    assert _patch(client, cabecalho, pedido, DEVOLVER).status_code == 409
+
+
+@pytest.mark.parametrize("corpo, campo", [
+    ({}, "status"),
+    ({"status": "pago"}, "status"),
+    ({"status": "entregue"}, "status"),
+    ({"status": "devolucao_solicitada"}, "motivo"),
+    ({"status": "devolucao_solicitada", "motivo": " ab "}, "motivo"),
+    ({"status": "devolucao_solicitada", "motivo": "x" * 301}, "motivo"),
+    ({"status": "devolucao_solicitada", "motivo": 123}, "motivo"),
+])
+def test_corpo_invalido_responde_400(app, client, cabecalho, usuario_id, corpo, campo):
+    _, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+
+    resposta = _patch(client, cabecalho, pedido, corpo)
+
+    assert resposta.status_code == 400
+    assert campo in resposta.get_json()["detalhes"]
+    assert _ler(client, cabecalho, pedido)["status"] == "aguardando_pagamento"
+
+
+def test_patch_sem_corpo_json_responde_400(app, client, cabecalho, usuario_id):
+    _, pedido = _criar_pedido(app, client, cabecalho, usuario_id)
+
+    assert client.patch(f"/pedidos/{pedido['id']}", headers=cabecalho).status_code == 400
+
+
+def test_patch_em_pedido_de_outro_usuario_responde_404(app, client, cabecalho, cabecalho_de):
+    outro_id = inserir_usuario(app)
+    solicitacao, pedido = _criar_pedido(app, client, cabecalho_de(outro_id), outro_id)
+
+    assert _patch(client, cabecalho, pedido, CANCELAR).status_code == 404
     assert _status_da_solicitacao(app, solicitacao) == "aprovada"
