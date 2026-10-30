@@ -93,3 +93,73 @@ vazias; o sistema não consulta ofertas nem conclui compras nessa plataforma.
 
 `docs/agentic-commerce.postman_collection.json` (importa no Postman ou no Insomnia).
 Rode "Login" primeiro: o token fica guardado para as outras requisições.
+
+## Deploy na EC2
+
+O deploy usa Ubuntu 24.04 LTS, Gunicorn e nginx. Os arquivos em `deploy/`
+pressupõem o clone em `/opt/agentic-commerce-api` e o build do React em
+`/var/www/agentic-commerce-web`. A equipe do frontend publica o build
+nesse segundo caminho.
+
+1. No console da AWS, crie uma instância t2.micro ou t3.micro com Ubuntu
+   24.04 LTS. Restrinja SSH (porta 22) ao IP de administração e abra HTTP
+   (porta 80). Anote o IP público; use Elastic IP se a conta permitir.
+2. Entre por SSH como `ubuntu` e prepare o clone da branch `main`:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y python3-venv git nginx curl
+   sudo mkdir -p /opt/agentic-commerce-api
+   sudo chown ubuntu:ubuntu /opt/agentic-commerce-api
+   git clone URL_DO_REPOSITORIO /opt/agentic-commerce-api
+   cd /opt/agentic-commerce-api
+   python3 -m venv .venv
+   .venv/bin/python -m pip install -r requirements.txt
+   ```
+
+   Substitua `URL_DO_REPOSITORIO` pela URL do repositório da API.
+3. Crie o arquivo de ambiente fora do clone e edite-o diretamente na
+   instância:
+
+   ```bash
+   sudo touch /etc/agentic-commerce-api.env
+   sudo chown root:root /etc/agentic-commerce-api.env
+   sudo chmod 600 /etc/agentic-commerce-api.env
+   sudoedit /etc/agentic-commerce-api.env
+   ```
+
+   Preencha `MONGO_URI`, `JWT_SECRET_KEY`,
+   `MONGO_DB_NAME=agentic_commerce`, `PROXY_FIX=1`,
+   `CATALOGO_PROVEDOR=combinado` e `CORS_ORIGINS` com a origem do frontend.
+   Mantenha as variáveis `ML_*` vazias. Não coloque valores reais no Git.
+4. Libere o IP público da instância no *Network Access* do Atlas. Instale
+   e ative o serviço da API:
+
+   ```bash
+   sudo cp deploy/agentic-commerce-api.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now agentic-commerce-api
+   ```
+
+5. Instale e ative o site nginx:
+
+   ```bash
+   sudo cp deploy/nginx-agentic-commerce.conf /etc/nginx/sites-available/agentic-commerce
+   sudo ln -s /etc/nginx/sites-available/agentic-commerce /etc/nginx/sites-enabled/agentic-commerce
+   if [ -L /etc/nginx/sites-enabled/default ]; then
+       sudo unlink /etc/nginx/sites-enabled/default
+   fi
+   sudo nginx -t
+   sudo systemctl enable --now nginx
+   sudo systemctl reload nginx
+   ```
+6. Fora da AWS, confira `http://IP_PUBLICO_DA_EC2/api/health`: deve
+   responder `200` com `"banco": "ok"`. Autentique-se e confira se
+   `POST /api/politicas` devolve um `Location` iniciado por `/api`.
+   Repita o teste de saúde depois de reiniciar a instância.
+
+Para atualizar o clone em produção, execute `bash deploy/atualizar.sh` como
+`ubuntu`. O script exige a branch `main`, faz `git pull --ff-only`, instala
+as dependências, reinicia o serviço e verifica `/health` localmente.
+Consulte os logs com
+`sudo journalctl -u agentic-commerce-api -n 50 --no-pager`.

@@ -1,0 +1,17 @@
+[Unit]
+Description=API Flask do Agentic Commerce
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/agentic-commerce-api
+EnvironmentFile=/etc/agentic-commerce-api.env
+ExecStart=/opt/agentic-commerce-api/.venv/bin/gunicorn -c deploy/gunicorn.conf.py wsgi:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
