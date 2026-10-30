@@ -1,13 +1,13 @@
 """Auxiliares dos testes do M3: usuários e solicitações gravados direto no mongomock, e ganchos isolados.
 
 Não é coletado pelo pytest (não começa com `test_`). As fixtures daqui precisam ser importadas no arquivo de
-teste: `from tests.apoio_pagamento import eventos, ganchos_isolados  # noqa: F401`.
+teste: `from tests.apoio_pagamento import eventos, ganchos_isolados, relogio  # noqa: F401`.
 
 A solicitação segue a seção 4 do contrato de integração, no mesmo formato que o M2 grava, para que os testes
 do M3 não dependam do código do M2.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from bson import ObjectId
@@ -90,6 +90,36 @@ def _oferta(id_externo, titulo, preco, categoria, marca, preco_por_unidade, unid
         "preco_por_unidade": preco_por_unidade, "unidade": unidade, "pontuacao": 0.9,
         "explicacao": ["Menor preço entre 1 oferta"],
     }
+
+
+class Relogio:
+    """Hora controlada pelo teste: começa agora e só anda com avancar().
+
+    Começa em milissegundos inteiros porque o BSON guarda datas com essa precisão; assim as datas lidas do
+    banco podem ser comparadas com o relógio por igualdade.
+    """
+
+    def __init__(self):
+        momento = _agora()
+        self.momento = momento.replace(microsecond=momento.microsecond // 1000 * 1000)
+
+    def __call__(self):
+        return self.momento
+
+    def avancar(self, **duracao):
+        self.momento += timedelta(**duracao)
+
+
+@pytest.fixture
+def relogio(monkeypatch):
+    """Troca o agora() do pagamento e do pós-compra pelo mesmo relógio: relogio.avancar(minutes=16)."""
+    from app.pagamento import regras as regras_pagamento
+    from app.pos_compra import regras as regras_pos_compra
+
+    relogio = Relogio()
+    monkeypatch.setattr(regras_pagamento, "agora", relogio)
+    monkeypatch.setattr(regras_pos_compra, "agora", relogio)
+    return relogio
 
 
 @pytest.fixture(autouse=True)
