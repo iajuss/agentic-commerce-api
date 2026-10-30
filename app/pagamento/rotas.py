@@ -12,10 +12,13 @@ from app.banco import documento_para_json, para_object_id
 from app.erros import ErroApi, ler_json
 from app.pagamento import regras, repositorio_autorizacoes, repositorio_contrato, repositorio_pedidos, servicos
 from app.pagamento.auditoria import auditar
+from app.pagamento.servicos import executar_compra_automatica
 from app.pagamento.validacao import validar_aprovacao, validar_pagamento_simulado, validar_pedido
 from app.pos_compra.servicos import aplicar_transicoes
 
 bp = Blueprint("pagamento", __name__)
+# Gancho da compra automática para o M2 (seção 6.2 do contrato).
+bp.record_once(lambda estado: estado.app.extensions.setdefault("compra_automatica", executar_compra_automatica))
 
 SOLICITACAO_NAO_ENCONTRADA = "Solicitação não encontrada."
 AUTORIZACAO_NAO_ENCONTRADA = "Autorização não encontrada."

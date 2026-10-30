@@ -69,6 +69,33 @@ def criar_pedido(usuario_id, autorizacao):
     return pedido
 
 
+def executar_compra_automatica(solicitacao):
+    """Gancho `compra_automatica` (seção 6.2 do contrato), chamado pelo M2 em POST /solicitacoes.
+
+    Emite a autorização automática, sem senha, e cria o pedido com Pix pelas mesmas funções das rotas.
+    Devolve {"autorizacao_id", "pedido_id"} como texto, ou None por motivo de negócio (nunca lança ErroApi).
+    """
+    avaliacao = solicitacao["avaliacao"]
+    if not (solicitacao["status"] == AGUARDANDO_APROVACAO and avaliacao["permitida"]
+            and avaliacao["compra_automatica"]
+            and all(item["status"] == regras.COM_OFERTA for item in solicitacao["itens"])):
+        return None
+
+    usuario_id = solicitacao["usuario_id"]
+    try:
+        autorizacao = emitir_autorizacao(usuario_id, solicitacao, "automatica")
+    except ErroApi:
+        return None  # o status mudou no meio: outra aprovação chegou antes
+    try:
+        autorizacao = consumir_autorizacao(usuario_id, autorizacao["_id"])
+    except ErroApi:
+        revogar_autorizacao(usuario_id, autorizacao["_id"])  # a solicitação volta para aprovação manual
+        return None
+
+    pedido = criar_pedido(usuario_id, autorizacao)
+    return {"autorizacao_id": str(autorizacao["_id"]), "pedido_id": str(pedido["_id"])}
+
+
 def confirmar_pagamento(usuario_id, txid):
     """Simula o Pix pago: o pedido vai para `pago` e a solicitação para `concluida`.
 
