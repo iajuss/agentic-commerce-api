@@ -84,7 +84,7 @@ Blueprints: as rotas do M3 ficam em `app/pagamento/rotas.py` (autorizações, `P
 | `solicitacoes` | M2 (documento inteiro); M3 (**só** `status` e `atualizada_em`, ver seção 5) | M2, M3 | Esquema na seção 4 |
 | `autorizacoes`, `pedidos`, `chamados` | M3 | M3 | Internas do M3 |
 | `auditoria` | M1, pelo gancho `registrar_evento` | M1 | Só inserção; nunca alterar nem apagar |
-| `integracoes` | M2 | M2 | Tokens do Mercado Livre; nunca expostos pela API |
+| `integracoes` | M2 | M2 | Tokens do Mercado Livre; nunca expostos pela API. Fora do MVP: só existe com o conector `mercadolivre` (o spike M2-01 escolheu a opção C) |
 
 **Esquema de `usuarios`** (o M1 garante): `_id`, `nome`, `email` (minúsculo), `senha_hash`, `criado_em` (já existem);
 o M1-04 acrescenta `data_nascimento` (texto `AAAA-MM-DD`), `endereco` {`cep`, `logradouro`, `numero`, `complemento`,
@@ -109,7 +109,7 @@ decrescente).
       "descricao": "arroz 5kg", "quantidade": 1, "status": "com_oferta",
       "recomendada": {
         "id_externo": "MLB123", "fonte": "mercadolivre", "titulo": "Arroz Branco Tipo 1 5kg",
-        "preco": 27.9, "frete": 0.0, "frete_gratis": true, "prazo_dias": 2,
+        "marca": "Marca Exemplo", "preco": 27.9, "frete": 0.0, "frete_gratis": true, "prazo_dias": 2, "estoque": 50,
         "categoria": "Arroz", "categorias_caminho": ["Alimentos e Bebidas", "Arroz"], "loja": "Loja Exemplo",
         "avaliacao": 4.7, "preco_por_unidade": 5.58, "unidade": "kg", "link": "https://...", "imagem": "https://...",
         "pontuacao": 0.91, "explicacao": ["Menor preço por kg entre 6 ofertas: R$ 5,58/kg", "Frete grátis"]
@@ -131,7 +131,15 @@ decrescente).
   `itens[].recomendada.{id_externo, titulo, preco, frete, loja}`, `cesta.{total, lojas}` e
   `avaliacao.{permitida, compra_automatica, politica_id, motivos}`. O M2 não pode renomear nem mudar o tipo deles.
 - Oferta: os campos obrigatórios são `id_externo`, `fonte`, `titulo`, `preco`, `categoria`, `categorias_caminho` e
-  `loja`; os demais podem ser `null` quando a fonte não informa.
+  `loja`; os demais podem ser `null` quando a fonte não informa. `marca` alimenta as marcas preferidas e evitadas do
+  perfil; `estoque` é a quantidade disponível (aproximada quando a fonte só informa faixas).
+- `fonte` no MVP é `fixo` (catálogo local) ou `dummyjson` (catálogo externo); `mercadolivre` fica para depois do MVP.
+  O exemplo acima mostra o formato que o conector do Mercado Livre vai ter.
+- `texto` é `null` quando a solicitação chega com `itens` já separados.
+- `itens[].quantidade` é o número de embalagens da `recomendada` a comprar, o mesmo que entra em `cesta.subtotal`.
+  O M2 ajusta a quantidade pedida ao tamanho da embalagem: "2 kg de feijão" com a oferta de 1 kg vira
+  `quantidade: 2`, e "Dez ovos" com a caixa de 12 vira `quantidade: 1`. A explicação do item conta o ajuste
+  ("Você pediu 2 kg: 2 embalagens de 1 kg").
 - Item `sem_oferta` tem `recomendada: null` e fica fora da cesta. `cesta.total` = `subtotal` + `frete`.
 - `avaliacao` é calculada pelo M2 sobre a cesta inteira; o M3 confia nela (não reavalia políticas no MVP).
 - `compra_automatica` é escrito pelo M2 com o retorno do gancho da seção 6.2 (ou `null`).
@@ -240,9 +248,9 @@ O M1 carrega todas as chaves em `app/config.py` (M1-01), lendo do `.env` e conve
 | `CORS_ORIGINS` | `http://localhost:5173` | M1 | Origens do front |
 | `HTTP_TIMEOUT_SEGUNDOS` | `8` | M1, M2 | Timeout de ViaCEP e catálogo |
 | `PROXY_FIX` | `0` | M1 | `1` na EC2, atrás do nginx (gera `Location` com `/api`) |
-| `CATALOGO_PROVEDOR` | `fixo` | M2 | `fixo`, `mercadolivre` ou `dummyjson` |
-| `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `ML_REDIRECT_URI`, `ML_REFRESH_TOKEN` | vazio | M2 | App do Mercado Livre (só com `mercadolivre`) |
-| `ML_VENDEDORES` | vazio | M2 | IDs de vendedores, se o spike escolher busca por vendedor |
+| `CATALOGO_PROVEDOR` | `fixo` | M2 | `fixo`, `dummyjson` ou `combinado` (fixo + DummyJSON no mesmo ranking: o da demonstração e da produção). `mercadolivre` fica para depois do MVP e, até lá, impede a API de subir |
+| `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `ML_REDIRECT_URI`, `ML_REFRESH_TOKEN` | vazio | M2 | App do Mercado Livre (só com `mercadolivre`; fora do MVP, ficam vazias) |
+| `ML_VENDEDORES` | vazio | M2 | IDs de vendedores, se o spike escolher busca por vendedor (fora do MVP) |
 | `PIX_EXPIRACAO_MINUTOS` | `30` | M3 | Validade da cobrança Pix |
 | `AUTORIZACAO_VALIDADE_MINUTOS` | `15` | M3 | Validade da autorização limitada |
 | `SIMULACAO_ENVIO_MINUTOS`, `SIMULACAO_ENTREGA_MINUTOS` | `2`, `5` | M3 | Ritmo do envio e da entrega simulados |
@@ -256,15 +264,25 @@ O M1 carrega todas as chaves em `app/config.py` (M1-01), lendo do `.env` e conve
 | Data | Mudança | Aprovada por |
 |---|---|---|
 | 27/10/2026 | Versão inicial do contrato do MVP | — |
+| 27/10/2026 | Seção 4: oferta com `marca` e `estoque`, `texto` nulo quando vierem `itens` e `itens[].quantidade` = embalagens a comprar. Seção 10: corpo de `POST /solicitacoes` e resumo de `GET /solicitacoes` | pendente (3 devs) |
+| 30/10/2026 | Opção C do spike M2-01 (MVP sem a API do Mercado Livre). Seção 8: `CATALOGO_PROVEDOR=combinado`; `mercadolivre` e as chaves `ML_*` ficam fora do MVP. Seção 3: `integracoes` fora do MVP. Seção 4: valores de `fonte` | pendente (3 devs) |
 
 ## 10. Exemplos de resposta para o front
 
 Ids são texto e datas vêm em ISO 8601 (`app/json.py`). Erro, em qualquer rota:
 `{"erro": "Política inválida.", "detalhes": {"teto_por_compra": "Informe um valor maior que zero."}}`.
 
+`POST /solicitacoes` recebe **exatamente um** de `{"texto": "arroz 5kg, 2 leites e detergente"}` (3 a 500
+caracteres) ou `{"itens": [{"descricao": "arroz 5kg", "quantidade": 1}]}` (1 a 20 itens; `quantidade` inteira de 1 a
+99, padrão 1). Corpo inválido responde `400` com o problema de cada campo em `detalhes`.
+
 `POST /solicitacoes` (`201`, `Location: /solicitacoes/<id>`): o documento da seção 4 com `id` no lugar de `_id`.
 Quando a compra automática acontece, vem `status: "aprovada"` e
 `"compra_automatica": {"autorizacao_id": "...", "pedido_id": "..."}`.
+
+`GET /solicitacoes` (`200`): o resumo de cada solicitação, das mais recentes para as mais antigas:
+`[{"id", "texto", "itens": ["arroz 5kg", "leites"], "status", "total", "criada_em"}]`, em que `itens` são as
+descrições e `total` é o `cesta.total`. O documento completo vem em `GET /solicitacoes/<solicitacao_id>`.
 
 `POST /pedidos` (`201`, `Location: /pedidos/<id>`):
 

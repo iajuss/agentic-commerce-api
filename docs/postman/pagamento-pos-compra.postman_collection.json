@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "Agentic Commerce API — Pagamento e pós-compra (M3)",
+    "description": "Aprovação, Pix simulado, pedidos e chamados. Rode \"Login\" primeiro: ele guarda o token em {{token}}. Preencha {{solicitacaoId}} com uma solicitação aguardando aprovação (criada pela coleção do M2). As requisições guardam {{autorizacaoId}}, {{pedidoId}}, {{txid}} e {{chamadoId}} para as seguintes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "solicitacaoId",
+      "value": ""
+    },
+    {
+      "key": "autorizacaoId",
+      "value": ""
+    },
+    {
+      "key": "pedidoId",
+      "value": ""
+    },
+    {
+      "key": "txid",
+      "value": ""
+    },
+    {
+      "key": "chamadoId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('token', pm.response.json().token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/sessoes",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"teste@exemplo.com\",\n  \"senha\": \"senha-forte-123\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Aprovar solicitação com senha",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code < 300) {",
+              "  const corpo = pm.response.json();",
+              "  pm.collectionVariables.set('autorizacaoId', corpo.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/solicitacoes/{{solicitacaoId}}/autorizacoes",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senha\": \"senha-forte-123\"\n}"
+        },
+        "description": "201 com a autorização limitada. 401 aqui significa senha incorreta, não sessão expirada: o front não deve deslogar o usuário. 422 quando nenhuma política permite a compra."
+      }
+    },
+    {
+      "name": "Listar autorizações ativas",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/autorizacoes"
+      }
+    },
+    {
+      "name": "Obter autorização",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/autorizacoes/{{autorizacaoId}}"
+      }
+    },
+    {
+      "name": "Criar pedido (gera o Pix)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code < 300) {",
+              "  const corpo = pm.response.json();",
+              "  pm.collectionVariables.set('pedidoId', corpo.id);",
+              "  pm.collectionVariables.set('txid', corpo.pix.txid);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/pedidos",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"autorizacao_id\": \"{{autorizacaoId}}\"\n}"
+        },
+        "description": "Usa a autorização (uso único) e devolve o pedido aguardando pagamento, com o Pix simulado."
+      }
+    },
+    {
+      "name": "Simular pagamento do Pix",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/simulador-pix/pagamentos",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"txid\": \"{{txid}}\"\n}"
+        },
+        "description": "O pedido vira pago e a solicitação, concluida. Envio em 2 minutos e entrega 5 minutos depois."
+      }
+    },
+    {
+      "name": "Obter pedido (comprovante)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+        "description": "Aplica as transições simuladas já devidas (expirado, enviado, entregue, devolvido)."
+      }
+    },
+    {
+      "name": "Listar pedidos",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/pedidos"
+      }
+    },
+    {
+      "name": "Abrir chamado",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code < 300) {",
+              "  const corpo = pm.response.json();",
+              "  pm.collectionVariables.set('chamadoId', corpo.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/pedidos/{{pedidoId}}/chamados",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assunto\": \"Produto faltando\",\n  \"mensagem\": \"O leite não veio na entrega.\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Listar chamados do pedido",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/pedidos/{{pedidoId}}/chamados"
+      }
+    },
+    {
+      "name": "Obter chamado",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/pedidos/{{pedidoId}}/chamados/{{chamadoId}}"
+      }
+    },
+    {
+      "name": "Cancelar pedido",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"cancelado\"\n}"
+        },
+        "description": "Aguardando pagamento, pago ou enviado. Pago ou enviado gera reembolso simulado."
+      }
+    },
+    {
+      "name": "Pedir devolução",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"devolucao_solicitada\",\n  \"motivo\": \"Veio o produto errado.\"\n}"
+        },
+        "description": "Só para pedido entregue, até 7 dias depois da entrega. Motivo de 3 a 300 caracteres."
+      }
+    },
+    {
+      "name": "Revogar autorização",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/autorizacoes/{{autorizacaoId}}",
+        "description": "Só antes de criar o pedido: a solicitação volta a aguardar aprovação. Depois de usada, 409."
+      }
+    }
+  ]
+}
