@@ -275,6 +275,22 @@ def test_campos_invalidos_retorna_todos_os_detalhes(client, conta):
     }
 
 
+def test_orcamento_excessivo_retorna_400_sem_alterar_perfil(client, conta):
+    resposta = client.patch(
+        "/usuarios/me",
+        json={"orcamento_mensal": 10**400},
+        headers=conta["cabecalho"],
+    )
+
+    assert resposta.status_code == 400
+    assert resposta.json == {
+        "erro": "Perfil inválido.",
+        "detalhes": {"orcamento_mensal": "Informe um valor maior que zero ou null."},
+    }
+    perfil = client.get("/usuarios/me", headers=conta["cabecalho"])
+    assert perfil.json["orcamento_mensal"] is None
+
+
 def test_perfil_e_sempre_do_usuario_do_token(client, conta):
     outro = client.post(
         "/usuarios",

@@ -56,6 +56,20 @@ def _lista_de_marcas(valor):
     return list(dict.fromkeys(item.strip().lower() for item in valor if item.strip()))
 
 
+def _normalizar_orcamento(valor):
+    """Arredonda valores válidos sem deixar conversões extremas virarem erro 500."""
+    if not isinstance(valor, (int, float)) or isinstance(valor, bool):
+        return None
+    try:
+        numero = float(valor)
+    except (OverflowError, ValueError):
+        return None
+    if not math.isfinite(numero):
+        return None
+    arredondado = round(numero, 2)
+    return arredondado if arredondado > 0 else None
+
+
 def validar_perfil(corpo):
     """Devolve só os campos reconhecidos ou aponta todos os erros encontrados."""
     campos = {}
@@ -126,15 +140,12 @@ def validar_perfil(corpo):
         orcamento = corpo["orcamento_mensal"]
         if orcamento is None:
             campos["orcamento_mensal"] = None
-        elif (
-            isinstance(orcamento, (int, float))
-            and not isinstance(orcamento, bool)
-            and math.isfinite(orcamento)
-            and round(float(orcamento), 2) > 0
-        ):
-            campos["orcamento_mensal"] = round(float(orcamento), 2)
         else:
-            erros["orcamento_mensal"] = "Informe um valor maior que zero ou null."
+            normalizado = _normalizar_orcamento(orcamento)
+            if normalizado is None:
+                erros["orcamento_mensal"] = "Informe um valor maior que zero ou null."
+            else:
+                campos["orcamento_mensal"] = normalizado
 
     if erros:
         raise ErroApi(400, "Perfil inválido.", erros)

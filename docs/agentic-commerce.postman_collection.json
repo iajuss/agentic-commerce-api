@@ -1,17 +1,84 @@
 {
   "info": {
     "name": "Agentic Commerce API",
-    "description": "Rotas da API. Rode \"Login\" primeiro: ele guarda o token na variável {{token}}, usada pelas demais.",
+    "description": "Coleção M1, M2 e M3 com execução sequencial. Cria recursos próprios para remoção, revogação e cancelamento; aguarda a entrega antes de pedir devolução. Configure baseUrl e rode a coleção inteira no Runner com intervalo de 5000 ms entre requisições (no Newman: --delay-request 5000). O ensaio usa contas e recursos de teste no banco configurado. Com os tempos padrão, pode levar cerca de oito minutos.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:5000" },
-    { "key": "token", "value": "" },
-    { "key": "politicaId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "emailEnsaio",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "politicaId",
+      "value": ""
+    },
+    {
+      "key": "solicitacaoId",
+      "value": ""
+    },
+    {
+      "key": "autorizacaoId",
+      "value": ""
+    },
+    {
+      "key": "pedidoId",
+      "value": ""
+    },
+    {
+      "key": "txid",
+      "value": ""
+    },
+    {
+      "key": "chamadoId",
+      "value": ""
+    },
+    {
+      "key": "politicaRemocaoId",
+      "value": ""
+    },
+    {
+      "key": "solicitacaoCancelamentoId",
+      "value": ""
+    },
+    {
+      "key": "solicitacaoAlternativaId",
+      "value": ""
+    },
+    {
+      "key": "autorizacaoRevogacaoId",
+      "value": ""
+    },
+    {
+      "key": "autorizacaoCancelamentoId",
+      "value": ""
+    },
+    {
+      "key": "pedidoCancelamentoId",
+      "value": ""
+    },
+    {
+      "key": "inicioEsperaEntrega",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -19,38 +86,144 @@
       "item": [
         {
           "name": "Health",
-          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/health" }
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Autenticação",
+      "name": "Conta e perfil",
       "item": [
         {
           "name": "Cadastro",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "url": "{{baseUrl}}/usuarios",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Teste\",\n  \"email\": \"teste@exemplo.com\",\n  \"senha\": \"senha-forte-123\"\n}" }
-          }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Teste\",\n  \"email\": \"{{emailEnsaio}}\",\n  \"senha\": \"senha-forte-123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('emailEnsaio', 'teste-' + Date.now() + '@exemplo.com');",
+                  "pm.collectionVariables.unset('inicioEsperaEntrega');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Login",
           "event": [
             {
               "listen": "test",
-              "script": { "exec": ["pm.collectionVariables.set('token', pm.response.json().token);"] }
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('token', pm.response.json().token);",
+                  "}"
+                ]
+              }
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "url": "{{baseUrl}}/sessoes",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"teste@exemplo.com\",\n  \"senha\": \"senha-forte-123\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailEnsaio}}\",\n  \"senha\": \"senha-forte-123\"\n}"
+            }
           }
+        },
+        {
+          "name": "Obter perfil",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/usuarios/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar perfil com ViaCEP",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/usuarios/me",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endereco\": {\n    \"cep\": \"01001000\",\n    \"numero\": \"10\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -59,45 +232,736 @@
       "item": [
         {
           "name": "Listar políticas",
-          "request": { "method": "GET", "url": "{{baseUrl}}/politicas" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/politicas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Criar política",
           "event": [
             {
               "listen": "test",
-              "script": { "exec": ["pm.collectionVariables.set('politicaId', pm.response.json().id);"] }
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('politicaId', pm.response.json().id);"
+                ]
+              }
             }
           ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/politicas",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Eletrônicos\",\n  \"teto_por_compra\": 500,\n  \"categorias\": [\"smartphones\", \"laptops\"],\n  \"lojas\": [],\n  \"nivel_autonomia\": \"automatica\"\n}"
+              "raw": "{\n  \"nome\": \"Mercado\",\n  \"teto_por_compra\": 500,\n  \"categorias\": [],\n  \"lojas\": [],\n  \"nivel_autonomia\": \"manual\",\n  \"ativa\": true\n}"
             }
           }
         },
         {
           "name": "Obter política",
-          "request": { "method": "GET", "url": "{{baseUrl}}/politicas/{{politicaId}}" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/politicas/{{politicaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Substituir política",
           "request": {
             "method": "PUT",
             "url": "{{baseUrl}}/politicas/{{politicaId}}",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Livros\",\n  \"teto_por_compra\": 80,\n  \"categorias\": [\"books\"],\n  \"nivel_autonomia\": \"manual\",\n  \"ativa\": true\n}"
+              "raw": "{\n  \"nome\": \"Mercado atualizado\",\n  \"teto_por_compra\": 600,\n  \"categorias\": [],\n  \"lojas\": [],\n  \"nivel_autonomia\": \"manual\",\n  \"ativa\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar política para remoção",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('politicaRemocaoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/politicas",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Temporária\",\n  \"teto_por_compra\": 100,\n  \"categorias\": [],\n  \"lojas\": [],\n  \"nivel_autonomia\": \"manual\",\n  \"ativa\": false\n}"
             }
           }
         },
         {
           "name": "Remover política",
-          "request": { "method": "DELETE", "url": "{{baseUrl}}/politicas/{{politicaId}}" }
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/politicas/{{politicaRemocaoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Solicitações",
+      "item": [
+        {
+          "name": "Criar solicitação (texto livre)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('solicitacaoCancelamentoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/solicitacoes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"arroz 5kg, 2 leites integrais e detergente\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Cancelar solicitação",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/solicitacoes/{{solicitacaoCancelamentoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar solicitação (itens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('solicitacaoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/solicitacoes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itens\": [\n    {\n      \"descricao\": \"arroz\",\n      \"quantidade\": 1\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Criar solicitação para revogação e cancelamento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('solicitacaoAlternativaId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/solicitacoes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itens\": [\n    {\n      \"descricao\": \"arroz\",\n      \"quantidade\": 1\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Listar solicitações",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/solicitacoes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obter solicitação",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/solicitacoes/{{solicitacaoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Autorizações",
+      "item": [
+        {
+          "name": "Aprovar solicitação com senha",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code < 300) {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.collectionVariables.set('autorizacaoId', corpo.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/solicitacoes/{{solicitacaoId}}/autorizacoes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senha\": \"senha-forte-123\"\n}"
+            },
+            "description": "201 com a autorização limitada. 401 aqui significa senha incorreta, não sessão expirada: o front não deve deslogar o usuário. 422 quando nenhuma política permite a compra."
+          }
+        },
+        {
+          "name": "Listar autorizações ativas",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/autorizacoes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obter autorização",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/autorizacoes/{{autorizacaoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aprovar solicitação para revogação",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('autorizacaoRevogacaoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/solicitacoes/{{solicitacaoAlternativaId}}/autorizacoes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senha\": \"senha-forte-123\"\n}"
+            },
+            "description": "201 com a autorização limitada. 401 aqui significa senha incorreta, não sessão expirada: o front não deve deslogar o usuário. 422 quando nenhuma política permite a compra."
+          }
+        },
+        {
+          "name": "Revogar autorização",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/autorizacoes/{{autorizacaoRevogacaoId}}",
+            "description": "Só antes de criar o pedido: a solicitação volta a aguardar aprovação. Depois de usada, 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reaprovar solicitação para cancelamento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('autorizacaoCancelamentoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/solicitacoes/{{solicitacaoAlternativaId}}/autorizacoes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senha\": \"senha-forte-123\"\n}"
+            },
+            "description": "201 com a autorização limitada. 401 aqui significa senha incorreta, não sessão expirada: o front não deve deslogar o usuário. 422 quando nenhuma política permite a compra."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pedidos e Pix",
+      "item": [
+        {
+          "name": "Criar pedido (gera o Pix)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code < 300) {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.collectionVariables.set('pedidoId', corpo.id);",
+                  "  pm.collectionVariables.set('txid', corpo.pix.txid);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/pedidos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"autorizacao_id\": \"{{autorizacaoId}}\"\n}"
+            },
+            "description": "Usa a autorização (uso único) e devolve o pedido aguardando pagamento, com o Pix simulado."
+          }
+        },
+        {
+          "name": "Criar pedido para cancelamento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('pedidoCancelamentoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/pedidos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"autorizacao_id\": \"{{autorizacaoCancelamentoId}}\"\n}"
+            },
+            "description": "Usa a autorização (uso único) e devolve o pedido aguardando pagamento, com o Pix simulado."
+          }
+        },
+        {
+          "name": "Simular pagamento do Pix",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/simulador-pix/pagamentos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"txid\": \"{{txid}}\"\n}"
+            },
+            "description": "O pedido vira pago e a solicitação, concluida. Envio em 2 minutos e entrega 5 minutos depois."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar pedidos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pós-compra",
+      "item": [
+        {
+          "name": "Obter pedido (comprovante)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+            "description": "Aplica as transições simuladas já devidas (expirado, enviado, entregue, devolvido)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar pedido",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/pedidos/{{pedidoCancelamentoId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelado\"\n}"
+            },
+            "description": "Aguardando pagamento, pago ou enviado. Pago ou enviado gera reembolso simulado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Abrir chamado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code < 300) {",
+                  "  const corpo = pm.response.json();",
+                  "  pm.collectionVariables.set('chamadoId', corpo.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}/chamados",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assunto\": \"Produto faltando\",\n  \"mensagem\": \"O leite não veio na entrega.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Listar chamados do pedido",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}/chamados"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obter chamado",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}/chamados/{{chamadoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aguardar entrega",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+            "description": "Repete GET /pedidos até a entrega simulada; no Runner configure intervalo de 5000 ms."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  const status = pm.response.json().status;",
+                  "  const inicio = Number(pm.collectionVariables.get('inicioEsperaEntrega') || Date.now());",
+                  "  pm.collectionVariables.set('inicioEsperaEntrega', String(inicio));",
+                  "  if (status === 'entregue') {",
+                  "    pm.collectionVariables.unset('inicioEsperaEntrega');",
+                  "  } else if (Date.now() - inicio >= 540000) {",
+                  "    pm.test('Entrega em até nove minutos', function () { throw new Error('Pedido não entregue no prazo'); });",
+                  "    pm.execution.setNextRequest(null);",
+                  "  } else if (status === 'pago' || status === 'enviado') {",
+                  "    pm.execution.setNextRequest('Aguardar entrega');",
+                  "  } else {",
+                  "    pm.test('Estado de entrega esperado', function () { throw new Error('Estado inesperado: ' + status); });",
+                  "    pm.execution.setNextRequest(null);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedir devolução",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/pedidos/{{pedidoId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"devolucao_solicitada\",\n  \"motivo\": \"Veio o produto errado.\"\n}"
+            },
+            "description": "Só para pedido entregue, até 7 dias depois da entrega. Motivo de 3 a 300 caracteres."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auditoria",
+      "item": [
+        {
+          "name": "Listar eventos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auditoria"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
