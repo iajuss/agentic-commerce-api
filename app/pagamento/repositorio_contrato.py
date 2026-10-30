@@ -8,6 +8,12 @@
 from app.banco import banco
 from app.pagamento import regras
 
+# Status da solicitação que o M3 lê ou define (seção 5 do contrato).
+AGUARDANDO_APROVACAO = "aguardando_aprovacao"
+APROVADA = "aprovada"
+CONCLUIDA = "concluida"
+EXPIRADA = "expirada"
+
 
 def obter_solicitacao(usuario_id, solicitacao_id):
     return banco()["solicitacoes"].find_one({"_id": solicitacao_id, "usuario_id": usuario_id})

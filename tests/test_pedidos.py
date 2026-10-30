@@ -256,7 +256,8 @@ def test_pix_vencido_nao_pode_ser_pago(app, client, cabecalho, usuario_id, relog
 
     assert resposta.status_code == 409
     assert resposta.get_json() == {"erro": "Esta cobrança Pix expirou."}
-    assert _status_da_solicitacao(app, solicitacao) == "aprovada"
+    assert client.get(f"/pedidos/{pedido['id']}", headers=cabecalho).get_json()["status"] == "expirado"
+    assert _status_da_solicitacao(app, solicitacao) == "expirada"
 
 
 def test_txid_de_outro_usuario_responde_404(app, client, cabecalho, cabecalho_de):

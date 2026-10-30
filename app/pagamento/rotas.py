@@ -13,6 +13,7 @@ from app.erros import ErroApi, ler_json
 from app.pagamento import regras, repositorio_autorizacoes, repositorio_contrato, repositorio_pedidos, servicos
 from app.pagamento.auditoria import auditar
 from app.pagamento.validacao import validar_aprovacao, validar_pagamento_simulado, validar_pedido
+from app.pos_compra.servicos import aplicar_transicoes
 
 bp = Blueprint("pagamento", __name__)
 
@@ -83,7 +84,8 @@ def criar_pedido():
 @bp.get("/pedidos")
 @jwt_required()
 def listar_pedidos():
-    pedidos = repositorio_pedidos.listar(usuario_atual_id())
+    usuario_id = usuario_atual_id()
+    pedidos = [aplicar_transicoes(usuario_id, pedido) for pedido in repositorio_pedidos.listar(usuario_id)]
     return jsonify([regras.resumo_do_pedido(pedido) for pedido in pedidos])
 
 
