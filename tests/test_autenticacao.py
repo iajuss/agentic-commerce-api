@@ -1,8 +1,12 @@
 """Cadastro, login e proteção das rotas da API."""
 
+from unittest.mock import Mock
+
 from flask import jsonify
 from flask_jwt_extended import decode_token
 from werkzeug.security import check_password_hash
+
+from app.autenticacao.rotas import HASH_SENHA_FICTICIA
 
 CADASTRO = {"nome": "  Ana Silva  ", "email": "  ANA@Exemplo.com  ", "senha": "senha-forte-123"}
 
@@ -54,7 +58,9 @@ def test_login_devolve_token_e_usuario_compativeis_com_o_front(client, app):
     assert resposta.json["usuario"] == {"id": usuario_id, "nome": "Ana Silva", "email": "ana@exemplo.com"}
     with app.app_context():
         assert decode_token(resposta.json["token"])["sub"] == usuario_id
-    assert client.get("/politicas", headers={"Authorization": f"Bearer {resposta.json['token']}"}).status_code == 200
+    assert client.get(
+        "/politicas", headers={"Authorization": f"Bearer {resposta.json['token']}"}
+    ).status_code == 200
 
 
 def test_login_rejeita_email_ou_senha_incorretos(client):
@@ -64,6 +70,19 @@ def test_login_rejeita_email_ou_senha_incorretos(client):
         resposta = client.post("/sessoes", json={"email": email, "senha": senha})
         assert resposta.status_code == 401
         assert resposta.json == {"erro": "E-mail ou senha inválidos."}
+
+
+def test_login_verifica_senha_com_email_inexistente(client, monkeypatch):
+    verificar_senha = Mock(return_value=False)
+    monkeypatch.setattr("app.autenticacao.rotas.check_password_hash", verificar_senha)
+
+    resposta = client.post(
+        "/sessoes", json={"email": "inexistente@exemplo.com", "senha": "senha-incorreta"}
+    )
+
+    assert resposta.status_code == 401
+    assert resposta.json == {"erro": "E-mail ou senha inválidos."}
+    verificar_senha.assert_called_once_with(HASH_SENHA_FICTICIA, "senha-incorreta")
 
 
 def test_login_rejeita_campos_ausentes(client):
@@ -83,7 +102,9 @@ def test_nova_rota_exige_token_sem_precisar_de_decorador(app, client):
     assert token.status_code == 401
 
     client.post("/usuarios", json=CADASTRO)
-    token = client.post("/sessoes", json={"email": CADASTRO["email"], "senha": CADASTRO["senha"]}).json["token"]
+    token = client.post(
+        "/sessoes", json={"email": CADASTRO["email"], "senha": CADASTRO["senha"]}
+    ).json["token"]
     assert client.get("/rota-de-teste", headers={"Authorization": f"Bearer {token}"}).status_code == 200
 
 
@@ -96,5 +117,8 @@ def test_token_invalido_responde_401_em_json(client):
 
 def test_health_e_preflight_continuam_publicos(client):
     assert client.get("/health").status_code == 200
-    resposta = client.options("/politicas", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"})
+    resposta = client.options(
+        "/politicas",
+        headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"},
+    )
     assert resposta.status_code == 200
