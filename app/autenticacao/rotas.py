@@ -86,20 +86,23 @@ def _endereco_atualizado(atual, alteracoes):
     return endereco
 
 
-@bp.get("/usuarios/me")
-def obter_perfil():
-    usuario = repositorio.obter(usuario_atual_id())
+def _usuario_da_sessao():
+    usuario_id = usuario_atual_id()
+    usuario = repositorio.obter(usuario_id)
     if usuario is None:
         raise ErroApi(401, "Sessão inválida. Faça login novamente.")
+    return usuario_id, usuario
+
+
+@bp.get("/usuarios/me")
+def obter_perfil():
+    _, usuario = _usuario_da_sessao()
     return jsonify(_perfil_publico(usuario))
 
 
 @bp.patch("/usuarios/me")
 def atualizar_perfil():
-    usuario_id = usuario_atual_id()
-    usuario = repositorio.obter(usuario_id)
-    if usuario is None:
-        raise ErroApi(401, "Sessão inválida. Faça login novamente.")
+    usuario_id, usuario = _usuario_da_sessao()
 
     campos = validar_perfil(ler_json())
     if not campos:
