@@ -2,6 +2,7 @@
 
 from flask import current_app
 
+from app.solicitacoes.catalogo.combinado import CatalogoCombinado
 from app.solicitacoes.catalogo.dummyjson import CatalogoDummyJson
 from app.solicitacoes.catalogo.fixo import CatalogoFixo
 
@@ -16,8 +17,13 @@ def _criar_dummyjson(config):
     return CatalogoDummyJson(timeout=int(config.get("HTTP_TIMEOUT_SEGUNDOS", 8)))
 
 
-# Cada provedor recebe a configuração do app e devolve uma instância de Catalogo.
-FABRICAS = {"fixo": _criar_fixo, "dummyjson": _criar_dummyjson}
+def _criar_combinado(config):
+    return CatalogoCombinado([_criar_fixo(config), _criar_dummyjson(config)])
+
+
+# Cada provedor recebe a configuração do app e devolve uma instância de Catalogo. "combinado" (fixo + DummyJSON)
+# é o da demonstração e da produção no MVP; o "mercadolivre" ficou para depois (opção C do spike M2-01).
+FABRICAS = {"fixo": _criar_fixo, "dummyjson": _criar_dummyjson, "combinado": _criar_combinado}
 
 
 def fabrica_do_provedor(config):

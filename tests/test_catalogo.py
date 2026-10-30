@@ -157,6 +157,6 @@ def test_provedor_sem_conector_impede_a_api_de_subir(provedor):
         criar_app_com_provedor(provedor)
 
 
-@pytest.mark.parametrize("provedor", ["fixo", "dummyjson", ""])
+@pytest.mark.parametrize("provedor", ["fixo", "dummyjson", "combinado", ""])
 def test_provedor_com_conector_ou_vazio_deixa_a_api_subir(provedor):
     assert "solicitacoes" in criar_app_com_provedor(provedor).blueprints
