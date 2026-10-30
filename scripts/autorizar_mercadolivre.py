@@ -1,12 +1,15 @@
-"""Spike do Mercado Livre (M2-01): autoriza o app do time e testa se o token permite buscar ofertas.
+"""Spike do Mercado Livre (M2-01): o que a API responde sem token e, com o app do time, com token.
 
-Uso (na raiz do repositório, com o ambiente virtual ativo e o .env com ML_CLIENT_ID, ML_CLIENT_SECRET e
-ML_REDIRECT_URI):
+Uso (na raiz do repositório, com o ambiente virtual ativo):
+    python scripts/autorizar_mercadolivre.py verificar   # sem app nem token: o que a API responde hoje
     python scripts/autorizar_mercadolivre.py autorizar   # abre o fluxo OAuth e imprime o ML_REFRESH_TOKEN
     python scripts/autorizar_mercadolivre.py testar      # testa as buscas com o ML_REFRESH_TOKEN do .env
 
-O refresh token é de uso único: cada execução de "testar" imprime um novo, que precisa substituir o do .env.
-Nenhum token vai para o Git; os valores ficam só no .env de quem roda o spike.
+"autorizar" e "testar" precisam do .env com ML_CLIENT_ID, ML_CLIENT_SECRET e ML_REDIRECT_URI. O refresh token é
+de uso único: cada execução de "testar" imprime um novo, que precisa substituir o do .env. Nenhum token vai para o
+Git; os valores ficam só no .env de quem roda o spike.
+
+No MVP, o spike ficou na opção C (docs/spike-mercadolivre.md): "autorizar" e "testar" ficam para depois dele.
 """
 
 import os
@@ -29,6 +32,10 @@ CHAMADAS_DO_SPIKE = (
     ("A", "Busca no catálogo de produtos", "/products/search", {"site_id": "MLB", "q": "arroz", "limit": 3}),
     ("-", "Previsão de categoria (pública)", "/sites/MLB/domain_discovery/search",
      {"q": "arroz 5kg", "limit": 1}),
+)
+# Chamadas públicas que "verificar" também confere, sem token.
+CHAMADAS_PUBLICAS = (
+    ("-", "Árvore de categorias (Alimentos e Bebidas)", "/categories/MLB1403", {}),
 )
 
 
@@ -85,35 +92,61 @@ def testar():
     print("O refresh token anterior deixou de valer. Atualize o .env com o novo:")
     print(f"ML_REFRESH_TOKEN={tokens['refresh_token']}\n")
 
-    chamadas = list(CHAMADAS_DO_SPIKE)
-    vendedor = os.getenv("ML_VENDEDORES", "").split(",")[0].strip()
-    if vendedor:
-        chamadas.append(("B", f"Busca no vendedor {vendedor}", "/sites/MLB/search",
-                         {"seller_id": vendedor, "category": "MLB1403", "limit": 3}))
-
-    cabecalho = {"Authorization": f"Bearer {tokens['access_token']}"}
-    for opcao, nome, caminho, parametros in chamadas:
-        try:
-            resposta = requests.get(
-                URL_API + caminho, params=parametros, headers=cabecalho, timeout=TIMEOUT_SEGUNDOS
-            )
-        except requests.RequestException as erro:
-            print(f"[{opcao}] ERRO  {nome}: {erro}")
-            continue
-        detalhe = ""
-        if resposta.ok:
-            corpo = resposta.json()
-            if isinstance(corpo, dict) and "results" in corpo:
-                detalhe = f"{len(corpo['results'])} resultados nesta página"
-        print(f"[{opcao}] {resposta.status_code}  {nome}  {caminho}  {detalhe}")
+    _rodar(_com_vendedor(CHAMADAS_DO_SPIKE), {"Authorization": f"Bearer {tokens['access_token']}"})
 
     print("\nDecisão (registre em docs/spike-mercadolivre.md):")
     print("  A: alguma chamada [A] respondeu 200 com resultados -> conector mercadolivre por busca;")
     print("  B: só a chamada [B] respondeu 200 -> conector mercadolivre por vendedor (ML_VENDEDORES);")
-    print("  C: nenhuma -> manter CATALOGO_PROVEDOR=dummyjson (o ViaCEP garante a API externa da rubrica).")
+    print("  C: nenhuma -> CATALOGO_PROVEDOR=combinado (catálogo fixo + DummyJSON no mesmo ranking).")
 
 
-COMANDOS = {"autorizar": autorizar, "testar": testar}
+def verificar():
+    """Sem app nem token: repete as chamadas do spike e as públicas, para registrar o que a API responde."""
+    _rodar(_com_vendedor([*CHAMADAS_DO_SPIKE, *CHAMADAS_PUBLICAS]))
+    print("\nBuscas [A] e [B] com 403: sem app e token não há como buscar ofertas, e vale a opção C")
+    print("(docs/spike-mercadolivre.md). Com o app do time, rode \"autorizar\" e depois \"testar\".")
+
+
+def _com_vendedor(chamadas):
+    """As chamadas, mais a busca no primeiro vendedor de ML_VENDEDORES (opção B), se houver."""
+    vendedor = os.getenv("ML_VENDEDORES", "").split(",")[0].strip()
+    if not vendedor:
+        return list(chamadas)
+    return [*chamadas, ("B", f"Busca no vendedor {vendedor}", "/sites/MLB/search",
+                        {"seller_id": vendedor, "category": "MLB1403", "limit": 3})]
+
+
+def _rodar(chamadas, cabecalho=None):
+    """Faz cada chamada e imprime o status com um resumo da resposta (nunca o token)."""
+    for opcao, nome, caminho, parametros in chamadas:
+        try:
+            resposta = requests.get(
+                URL_API + caminho, params=parametros, headers=cabecalho or {}, timeout=TIMEOUT_SEGUNDOS
+            )
+        except requests.RequestException as erro:
+            print(f"[{opcao}] ERRO  {nome}: {erro}")
+            continue
+        print(f"[{opcao}] {resposta.status_code}  {nome}  {caminho}  {_resumo(resposta)}")
+
+
+def _resumo(resposta):
+    """Quantos resultados a busca trouxe, a categoria prevista ou o motivo do erro."""
+    try:
+        corpo = resposta.json()
+    except ValueError:
+        return ""
+    if isinstance(corpo, list):
+        return f"{corpo[0].get('category_id')} ({corpo[0].get('category_name')})" if corpo else "lista vazia"
+    if not isinstance(corpo, dict):
+        return ""
+    if "results" in corpo:
+        return f"{len(corpo['results'])} resultados nesta página"
+    if not resposta.ok:
+        return str(corpo.get("message") or corpo.get("error") or "")
+    return str(corpo.get("name") or "")
+
+
+COMANDOS = {"verificar": verificar, "autorizar": autorizar, "testar": testar}
 
 if __name__ == "__main__":
     load_dotenv()

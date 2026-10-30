@@ -11,6 +11,8 @@ def oferta(id_externo, titulo, preco, **campos):
 
 ARROZ_1KG = oferta("A1", "Arroz Branco 1kg", 6.49)
 ARROZ_5KG = oferta("A5", "Arroz Branco 5kg", 27.90)
+LEITE_1L = oferta("L1", "Leite Integral 1L", 5.29)
+LEITE_CAIXA = oferta("L12", "Leite Integral Caixa 12x1L", 57.90)
 
 
 def ids(ofertas):
@@ -55,15 +57,38 @@ def test_mesma_entrada_gera_a_mesma_ordem_com_desempate_por_id():
     assert ids(ranquear(list(reversed(iguais)))) == ["C1", "C2", "C3"]
 
 
-def test_unidades_diferentes_comparam_pelo_preco():
-    pacote = oferta("P1", "Papel Higiênico 12 Rolos", 19.90)
-    sem_medida = oferta("P2", "Papel Higiênico Folha Dupla", 9.90)
+def test_sem_nenhuma_medida_compara_pelo_preco():
+    ranqueadas = ranquear([oferta("R2", "Arroz Tipo 1", 6.49), oferta("R1", "Rice", 5.99)])
 
-    ranqueadas = ranquear([pacote, sem_medida])
-
-    assert ranqueadas[0]["id_externo"] == "P2"
-    assert ranqueadas[0]["explicacao"][0] == "Menor preço entre 2 ofertas: R$ 9,90"
+    assert ids(ranqueadas) == ["R1", "R2"]
+    assert ranqueadas[0]["explicacao"][0] == "Menor preço entre 2 ofertas: R$ 5,99"
     assert ranqueadas[0]["preco_por_unidade"] is None
+
+
+def test_oferta_sem_medida_nao_desliga_o_preco_por_kg_das_outras():
+    sem_medida = oferta("DJ", "Rice", 5.99)
+
+    ranqueadas = ranquear([ARROZ_1KG, sem_medida, ARROZ_5KG])
+
+    assert ids(ranqueadas) == ["A5", "A1", "DJ"]
+    assert ranqueadas[0]["explicacao"][0] == "Menor preço por kg entre 2 ofertas: R$ 5,58/kg"
+    assert ranqueadas[-1]["explicacao"][0] == "Preço: R$ 5,99 (embalagem sem medida em kg)"
+    assert ranqueadas[-1]["preco_por_unidade"] is None
+
+
+def test_oferta_em_outra_unidade_fica_com_a_nota_neutra_no_preco():
+    ranqueadas = ranquear([oferta("C1", "Café 500g", 19.90), oferta("C2", "Café 1kg", 34.90),
+                           oferta("C3", "Café Gelado 1L", 9.90)])
+
+    assert ids(ranqueadas) == ["C2", "C1", "C3"]
+    assert ranqueadas[-1]["explicacao"][0] == "Preço: R$ 9,90 (embalagem sem medida em kg)"
+
+
+def test_empate_de_unidades_compara_na_primeira_em_ordem_alfabetica():
+    ranqueadas = ranquear([oferta("L1", "Leite 1L", 5.29), oferta("K1", "Leite em Pó 400g", 18.90)])
+
+    assert ranqueadas[0]["explicacao"][0] == "Preço por kg: R$ 47,25/kg"
+    assert ranqueadas[1]["explicacao"][0] == "Preço: R$ 5,29 (embalagem sem medida em kg)"
 
 
 def test_criterio_ausente_recebe_nota_neutra_e_fica_fora_da_explicacao():
@@ -96,10 +121,33 @@ def test_marca_preferida_sobe_e_marca_evitada_desce():
 
 
 def test_embalagem_igual_a_pedida_ganha_bonus():
-    ranqueadas = ranquear([ARROZ_5KG, ARROZ_1KG], medida_pedida={"quantidade": 1.0, "unidade": "kg"})
+    meio_pacote = oferta("A25", "Arroz Branco 2,5kg", 13.95)  # mesmo preço por kg do pacote de 5 kg
 
-    assert ranqueadas[0]["id_externo"] == "A1"
-    assert "Embalagem igual à pedida (1 kg)" in ranqueadas[0]["explicacao"]
+    ranqueadas = ranquear([meio_pacote, ARROZ_5KG], descricao="arroz 5kg")
+
+    assert ids(ranqueadas) == ["A5", "A25"]
+    assert "Embalagem igual à pedida (5 kg)" in ranqueadas[0]["explicacao"]
+
+
+def test_com_medida_no_pedido_o_que_sobra_nao_barateia_o_preco():
+    ranqueadas = ranquear([ARROZ_5KG, ARROZ_1KG], quantidade=2, descricao="arroz 1kg")
+
+    assert ids(ranqueadas) == ["A1", "A5"]
+    assert ranqueadas[1]["explicacao"][0] == "Preço por kg: R$ 13,95/kg (o pedido usa 2 kg de 5 kg)"
+
+
+def test_multipack_conta_so_os_itens_pedidos():
+    ranqueadas = ranquear([LEITE_CAIXA, LEITE_1L], quantidade=2, descricao="leites")
+
+    assert ids(ranqueadas) == ["L1", "L12"]
+    assert ranqueadas[1]["explicacao"][0] == "Preço por L: R$ 28,95/L (o pedido usa 2 L de 12 L)"
+    assert ranqueadas[1]["preco_por_unidade"] == round(57.90 / 12, 2)
+
+
+def test_multipack_vale_quando_o_pedido_usa_a_caixa_inteira():
+    ranqueadas = ranquear([LEITE_1L, LEITE_CAIXA], quantidade=12, descricao="leites")
+
+    assert ids(ranqueadas) == ["L12", "L1"]
 
 
 def test_nao_altera_as_ofertas_recebidas():

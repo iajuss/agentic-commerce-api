@@ -59,6 +59,15 @@ def test_termo_sem_nenhuma_traducao_devolve_lista_vazia(chamadas):
     assert CatalogoDummyJson().buscar("detergente") == []
 
 
+def test_papel_higienico_nao_vira_caixa_de_lenco(monkeypatch):
+    lenco = {**FIXTURE["products"][0], "id": 27, "title": "Tissue Paper Box"}
+    monkeypatch.setattr(dummyjson.requests, "get", lambda url, **kwargs: RespostaFalsa({"products": [lenco]}))
+    catalogo = CatalogoDummyJson()
+
+    assert catalogo.buscar("papel higiênico") == []
+    assert [oferta["titulo"] for oferta in catalogo.buscar("lenço")] == ["Tissue Paper Box"]
+
+
 def test_normaliza_preco_prazo_e_frete(chamadas):
     arroz = CatalogoDummyJson().buscar("arroz")[0]
 

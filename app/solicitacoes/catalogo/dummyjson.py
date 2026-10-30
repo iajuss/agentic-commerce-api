@@ -22,14 +22,15 @@ INDISPONIVEL = "Catálogo indisponível no momento. Tente novamente em instantes
 LOJA_PADRAO = "DummyJSON"
 CATEGORIA = "Mercearia"
 
-# Radical em português (sem acento) -> palavras em inglês que precisam aparecer no título.
+# Radical em português (sem acento) -> palavras em inglês que precisam aparecer no título. "papel" fica de fora:
+# "papel higiênico" casaria com a caixa de lenço ("Tissue Paper Box"), que é o que "lenço" encontra.
 TRADUCOES = {
     "arroz": "rice", "leite": "milk", "ovo": "eggs", "cafe": "coffee", "agua": "water", "suco": "juice",
     "maca": "apple", "carne": "beef", "bife": "steak", "frango": "chicken", "peixe": "fish", "oleo": "oil",
     "batata": "potatoes", "cebola": "onions", "pepino": "cucumber", "pimentao": "bell pepper",
     "pimenta": "chili pepper", "mel": "honey", "sorvete": "ice cream", "kiwi": "kiwi", "limao": "lemon",
     "amora": "mulberry", "morango": "strawberry", "refrigerante": "soft drinks", "lenco": "tissue",
-    "papel": "paper", "racao": "food", "gato": "cat", "cachorro": "dog", "proteina": "protein",
+    "racao": "food", "gato": "cat", "cachorro": "dog", "proteina": "protein",
 }
 
 PRAZO = re.compile(r"(\d+)(?:-(\d+))?\s*(business day|day|week|month)")

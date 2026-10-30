@@ -60,8 +60,13 @@ Branch `chore/m2-spike-mercadolivre` · Quarta, com limite de tempo: **decisão 
 - **C:** nada funciona até 14h → conector `dummyjson`, com o Mercado Livre só para prever categorias (público).
 
 **Aceite:**
-- [ ] Decisão registrada.
-- [ ] Respostas de exemplo **sem tokens** salvas em `tests/fixtures/` para os testes do M2-03.
+- [x] Decisão registrada.
+- [x] Respostas de exemplo **sem tokens** salvas em `tests/fixtures/` para os testes do M2-03.
+
+**Decisão (30/10/2026): opção C, sem a API do Mercado Livre no MVP.** Motivos, chamadas verificadas sem token e o
+que fica para depois em `docs/spike-mercadolivre.md`. No MVP, `CATALOGO_PROVEDOR=combinado` junta o catálogo fixo e
+a DummyJSON no mesmo ranking, e o `domain_discovery` não é usado (as categorias vêm do próprio catálogo). A fixture
+dos testes do M2-03 é `tests/fixtures/dummyjson_groceries.json`, resposta real da DummyJSON.
 
 ## M2-02 — Interface do catálogo e catálogo fixo
 Branch `feat/m2-catalogo` · Quarta
@@ -110,6 +115,8 @@ Branch `feat/m2-catalogo-externo` · Quarta à tarde e quinta · Rubrica: API ex
 - Os títulos estão em inglês: use um dicionário PT→EN dos itens comuns (arroz→rice, leite→milk, ovos→eggs,
   café→coffee, água→water, suco→juice etc.).
 - `fonte: "dummyjson"` e `categorias_caminho: ["Mercearia"]`.
+- Escolhida no M2-01 (30/10). `catalogo/combinado.py` (`CATALOGO_PROVEDOR=combinado`) junta a DummyJSON ao catálogo
+  fixo no mesmo ranking; se ela cair, a busca segue com o fixo.
 
 **Nas duas opções:**
 - `requests` com `timeout` = `HTTP_TIMEOUT_SEGUNDOS` (padrão 8).

@@ -2,7 +2,8 @@
 
 import pytest
 
-from app.solicitacoes.medidas import embalagens_necessarias, extrair_medida, formatar_medida
+from app.solicitacoes.medidas import (embalagens_necessarias, extrair_medida, formatar_medida,
+                                      quantidade_aproveitada)
 
 
 def medida(quantidade, unidade):
@@ -88,3 +89,20 @@ def test_ajuste_da_quantidade_vem_explicado(quantidade, descricao, titulo, frase
 
 def test_quantidade_que_nao_muda_nao_gera_explicacao():
     assert embalagens_necessarias(1, "arroz 5kg", "Arroz Branco 5kg") == (1, None)
+
+
+@pytest.mark.parametrize("quantidade, descricao, titulo, aproveitada", [
+    # num multipack, contam só os itens pedidos, a não ser que o pedido seja de embalagens
+    (2, "leites", "Leite Integral Caixa 12x1L", 2.0),
+    (12, "leites", "Leite Integral Caixa 12x1L", 12.0),
+    (2, "fardos de água", "Água Mineral Fardo 6x1,5L", 18.0),
+    # com medida no pedido, conta só a quantidade pedida
+    (2, "arroz 1kg", "Arroz Branco 5kg", 2.0),
+    (1, "arroz 5kg", "Arroz Branco 1kg", 5.0),
+    # nos demais casos, a embalagem inteira
+    (1, "arroz", "Arroz Branco 5kg", 5.0),
+    (10, "ovos", "Ovos Brancos 12 Unidades", 12.0),
+    (1, "pão de forma", "Pão de Forma Tradicional", None),
+])
+def test_quantidade_aproveitada_conta_so_o_que_atende_ao_pedido(quantidade, descricao, titulo, aproveitada):
+    assert quantidade_aproveitada(quantidade, descricao, titulo) == aproveitada

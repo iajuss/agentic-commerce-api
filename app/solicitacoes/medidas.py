@@ -5,8 +5,13 @@ Servem para comparar o preço por kg, litro ou unidade e para calcular quantas e
 
 import math
 import re
+from collections import namedtuple
 
 from app.solicitacoes.catalogo.base import radical, sem_acentos
+
+# Oferta com vários itens dentro: um multipack ("6x500ml", "Pack 12 Latas") ou um pacote de itens soltos
+# ("12 Unidades", "12 Rolos").
+ItensSoltos = namedtuple("ItensSoltos", "itens multipack")
 
 # Unidade escrita no título -> (unidade base, fator de conversão).
 UNIDADES = {
@@ -82,14 +87,37 @@ def embalagens_necessarias(quantidade, descricao, titulo):
         frase = f"Você pediu {formatar_medida(total)}: {_embalagens(embalagens)} de {formatar_medida(medida)}"
     else:
         soltos = _itens_soltos(titulo)
-        if soltos is None:
+        if soltos is None or _fala_da_embalagem(descricao, soltos):
             return quantidade, None
-        itens, nomes_da_embalagem = soltos
-        if nomes_da_embalagem & _palavras(descricao):
-            return quantidade, None
-        embalagens = _arredondar_para_cima(quantidade / itens)
-        frase = f"Você pediu {quantidade}: {_embalagens(embalagens)} com {itens} unidades"
+        embalagens = _arredondar_para_cima(quantidade / soltos.itens)
+        frase = f"Você pediu {quantidade}: {_embalagens(embalagens)} com {soltos.itens} unidades"
     return embalagens, frase if embalagens != quantidade else None
+
+
+def quantidade_aproveitada(quantidade, descricao, titulo):
+    """Quanto da compra atende ao pedido, na unidade da medida da oferta (None se a oferta não tem medida).
+
+    O que sobra não deve baratear o preço por kg/L/un: com medida no pedido, conta só a quantidade pedida ("arroz
+    1kg" num pacote de 5 kg aproveita 1 kg); num multipack, só os itens pedidos ("2 leites" numa caixa 12x1L
+    aproveitam 2 L). Nos demais casos conta a embalagem inteira, e vale o preço por unidade dela, como pede o
+    plano ("arroz" prefere o pacote de 5 kg).
+    """
+    medida = extrair_medida(titulo)
+    if medida is None:
+        return None
+    embalagens, _ = embalagens_necessarias(quantidade, descricao, titulo)
+    comprada = round(embalagens * medida["quantidade"], 3)
+
+    pedida = extrair_medida(descricao)
+    if pedida is not None:
+        if pedida["unidade"] != medida["unidade"]:
+            return comprada
+        return min(comprada, round(quantidade * pedida["quantidade"], 3))
+
+    soltos = _itens_soltos(titulo)
+    if soltos is None or not soltos.multipack or _fala_da_embalagem(descricao, soltos):
+        return comprada
+    return min(comprada, round(quantidade * medida["quantidade"] / soltos.itens, 3))
 
 
 def _medida(quantidade, unidade):
@@ -103,17 +131,23 @@ def _numero(texto):
 
 
 def _itens_soltos(titulo):
-    """(itens, palavras que nomeiam a embalagem) de uma oferta com vários itens dentro, ou None."""
+    """ItensSoltos da oferta com vários itens dentro, ou None."""
     for padrao in (MULTIPACK, PACK_DE_LATAS):
         encontrado = padrao.search(titulo or "")
         if encontrado:
             vezes = int(encontrado.group(1))
-            return (vezes, EMBALAGEM_EXTERNA) if vezes > 1 else None
+            return ItensSoltos(vezes, multipack=True) if vezes > 1 else None
 
     medida = extrair_medida(titulo)
     if medida and medida["unidade"] == "un" and medida["quantidade"] > 1:
-        return int(medida["quantidade"]), EMBALAGEM_DE_ITENS_SOLTOS
+        return ItensSoltos(int(medida["quantidade"]), multipack=False)
     return None
+
+
+def _fala_da_embalagem(descricao, soltos):
+    """O pedido conta embalagens ("2 caixas de ovos"), e não os itens de dentro."""
+    nomes = EMBALAGEM_EXTERNA if soltos.multipack else EMBALAGEM_DE_ITENS_SOLTOS
+    return bool(nomes & _palavras(descricao))
 
 
 def _palavras(texto):
