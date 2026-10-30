@@ -1,7 +1,9 @@
 """Contrato do M3: auxiliares de teste fiéis à seção 4, auditoria pelo gancho e datas em UTC."""
 
+import re
 from datetime import datetime, timedelta
 
+import pytest
 from bson import ObjectId
 from werkzeug.security import check_password_hash
 
@@ -101,3 +103,45 @@ def test_agora_dos_dois_modulos_e_utc():
         assert isinstance(momento, datetime)
         assert momento.utcoffset() == timedelta(0)
         assert momento.microsecond % 1000 == 0  # mesma precisão do BSON
+
+
+# Rotas do M3 (seção 2 do contrato): regras exatas e 401 sem token
+
+ROTAS_M3 = [
+    ("POST", "/solicitacoes/<solicitacao_id>/autorizacoes"),
+    ("GET", "/autorizacoes"),
+    ("GET", "/autorizacoes/<autorizacao_id>"),
+    ("DELETE", "/autorizacoes/<autorizacao_id>"),
+    ("POST", "/pedidos"),
+    ("GET", "/pedidos"),
+    ("POST", "/simulador-pix/pagamentos"),
+    ("GET", "/pedidos/<pedido_id>"),
+    ("PATCH", "/pedidos/<pedido_id>"),
+    ("POST", "/pedidos/<pedido_id>/chamados"),
+    ("GET", "/pedidos/<pedido_id>/chamados"),
+    ("GET", "/pedidos/<pedido_id>/chamados/<chamado_id>"),
+]
+CORPOS = {
+    "/solicitacoes/<solicitacao_id>/autorizacoes": {"senha": SENHA_PADRAO},
+    "/pedidos": {"autorizacao_id": str(ObjectId())},
+    "/simulador-pix/pagamentos": {"txid": "0" * 32},
+    "/pedidos/<pedido_id>": {"status": "cancelado"},
+    "/pedidos/<pedido_id>/chamados": {"assunto": "Produto faltando", "mensagem": "O leite não veio na entrega."},
+}
+
+
+def test_rotas_do_m3_existem_com_as_regras_do_contrato(app):
+    publicadas = {(metodo, regra.rule) for regra in app.url_map.iter_rules() for metodo in regra.methods}
+
+    assert len(ROTAS_M3) == 12
+    assert set(ROTAS_M3) <= publicadas
+
+
+@pytest.mark.parametrize("metodo, regra", ROTAS_M3)
+def test_rota_sem_token_responde_401(client, metodo, regra):
+    url = re.sub(r"<\w+>", lambda _: str(ObjectId()), regra)
+    corpo = CORPOS.get(regra) if metodo in ("POST", "PATCH") else None
+
+    resposta = client.open(url, method=metodo, json=corpo)
+
+    assert resposta.status_code == 401
