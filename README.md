@@ -129,10 +129,9 @@ nesse segundo caminho.
    ```
 
    Preencha `MONGO_URI`, `JWT_SECRET_KEY`,
-   `MONGO_DB_NAME=agentic_commerce`, `PROXY_FIX=1` e `CORS_ORIGINS` com a
-   origem do frontend. Confira `CATALOGO_PROVEDOR` e as credenciais do
-   catálogo somente se o provedor escolhido exigir. Não coloque valores
-   reais no Git.
+   `MONGO_DB_NAME=agentic_commerce`, `PROXY_FIX=1`,
+   `CATALOGO_PROVEDOR=combinado` e `CORS_ORIGINS` com a origem do frontend.
+   Mantenha as variáveis `ML_*` vazias. Não coloque valores reais no Git.
 4. Libere o IP público da instância no *Network Access* do Atlas. Instale
    e ative o serviço da API:
 
