@@ -10,9 +10,7 @@ def _colecao():
 
 
 def criar(nome, email, senha_hash):
-    """Cria o índice único antes de inserir, inclusive em um banco recém-criado."""
     colecao = _colecao()
-    colecao.create_index("email", unique=True)
     usuario = {
         "nome": nome,
         "email": email,
