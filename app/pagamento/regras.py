@@ -64,8 +64,13 @@ def montar_pedido(autorizacao, cobranca, momento):
 
 
 def pedido_para_json(pedido):
-    """Formato da seção 10 do contrato (sem o dono); `reembolso` só aparece quando existe."""
+    """Comprovante no formato da seção 10 do contrato (sem o dono); `reembolso` só aparece quando existe.
+
+    O `copia_e_cola` só serve enquanto o pedido aguarda pagamento; depois o Pix mostra só `txid` e `pago_em`.
+    """
     corpo = {"id": pedido["_id"], **{campo: pedido[campo] for campo in CAMPOS_DO_PEDIDO}}
+    if pedido["status"] != AGUARDANDO_PAGAMENTO:
+        corpo["pix"] = {"txid": pedido["pix"]["txid"], "pago_em": pedido["pix"]["pago_em"]}
     if pedido.get("reembolso"):
         corpo["reembolso"] = pedido["reembolso"]
     return corpo

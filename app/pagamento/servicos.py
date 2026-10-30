@@ -7,10 +7,9 @@ from flask import current_app
 from app.erros import ErroApi
 from app.pagamento import pix, regras, repositorio_autorizacoes, repositorio_contrato, repositorio_pedidos
 from app.pagamento.auditoria import auditar
-
-AGUARDANDO_APROVACAO = "aguardando_aprovacao"
-APROVADA = "aprovada"
-CONCLUIDA = "concluida"
+from app.pagamento.repositorio_contrato import AGUARDANDO_APROVACAO, APROVADA, CONCLUIDA
+from app.pos_compra import servicos as servicos_pos_compra
+from app.pos_compra.regras import EXPIRADO
 
 
 def emitir_autorizacao(usuario_id, solicitacao, origem):
@@ -71,10 +70,16 @@ def criar_pedido(usuario_id, autorizacao):
 
 
 def confirmar_pagamento(usuario_id, txid):
-    """Simula o Pix pago: o pedido vai para `pago` e a solicitação para `concluida`."""
+    """Simula o Pix pago: o pedido vai para `pago` e a solicitação para `concluida`.
+
+    Antes aplica as transições devidas, então um Pix vencido fica gravado como `expirado`.
+    """
     pedido = repositorio_pedidos.obter_por_txid(usuario_id, txid)
     if pedido is None:
         raise ErroApi(404, "Cobrança Pix não encontrada.")
+    pedido = servicos_pos_compra.aplicar_transicoes(usuario_id, pedido)
+    if pedido["status"] == EXPIRADO:
+        raise ErroApi(409, "Esta cobrança Pix expirou.")
     if pedido["status"] != regras.AGUARDANDO_PAGAMENTO:
         raise ErroApi(409, "Este pedido não está aguardando pagamento.")
 
