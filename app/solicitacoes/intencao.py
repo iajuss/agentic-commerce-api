@@ -16,7 +16,8 @@ TAMANHO_MAXIMO_DESCRICAO = 80
 SEPARADORES = re.compile(r"[,;\n]+|\s+e\s+", re.IGNORECASE)
 # "2 leites", "2x leite", "2 x leite"; um número seguido de unidade ("2 kg de feijão") é medida, não quantidade.
 QUANTIDADE_EM_DIGITOS = re.compile(
-    r"^(\d{1,2})\s*x?\s+(?!(?:kg|g|ml|l|lt|litros?|rolos?|un|unid|unidades?)\b)(.+)$", re.IGNORECASE
+    r"^(\d{1,2})\s*x?\s+(?!(?:kg|quilos?|kilos?|g|gramas?|ml|l|lt|litros?|rolos?|un|unid|unidades?)\b)(.+)$",
+    re.IGNORECASE,
 )
 POR_EXTENSO = {
     "um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "quatro": 4, "cinco": 5,

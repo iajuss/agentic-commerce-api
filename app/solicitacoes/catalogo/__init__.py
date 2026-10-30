@@ -20,6 +20,16 @@ def _criar_dummyjson(config):
 FABRICAS = {"fixo": _criar_fixo, "dummyjson": _criar_dummyjson}
 
 
+def fabrica_do_provedor(config):
+    """Fábrica do CATALOGO_PROVEDOR configurado; sem conector, o RuntimeError diz quais provedores existem."""
+    provedor = config.get("CATALOGO_PROVEDOR") or PROVEDOR_PADRAO
+    fabrica = FABRICAS.get(provedor)
+    if fabrica is None:
+        disponiveis = ", ".join(FABRICAS)
+        raise RuntimeError(f"CATALOGO_PROVEDOR={provedor} não está disponível. Use um de: {disponiveis}.")
+    return fabrica
+
+
 def obter_catalogo():
     """Catálogo do app atual, criado na primeira chamada.
 
@@ -27,10 +37,6 @@ def obter_catalogo():
     """
     catalogo = current_app.extensions.get("catalogo")
     if catalogo is None:
-        provedor = current_app.config.get("CATALOGO_PROVEDOR") or PROVEDOR_PADRAO
-        fabrica = FABRICAS.get(provedor)
-        if fabrica is None:
-            disponiveis = ", ".join(FABRICAS)
-            raise RuntimeError(f"CATALOGO_PROVEDOR={provedor} não está disponível. Use um de: {disponiveis}.")
-        catalogo = current_app.extensions["catalogo"] = fabrica(current_app.config)
+        criar = fabrica_do_provedor(current_app.config)
+        catalogo = current_app.extensions["catalogo"] = criar(current_app.config)
     return catalogo

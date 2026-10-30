@@ -15,6 +15,9 @@ from app.solicitacoes.catalogo.base import Catalogo, nova_oferta, palavras_relev
 
 URL_PRODUTOS = "https://dummyjson.com/products/category/groceries"
 VALIDADE_CACHE_SEGUNDOS = 600
+# Depois de uma falha, a DummyJSON só é consultada de novo após esta pausa. Sem ela, cada item da lista
+# esperaria o timeout outra vez (20 itens x 8 s passam do timeout do gunicorn).
+PAUSA_APOS_FALHA_SEGUNDOS = 60
 INDISPONIVEL = "Catálogo indisponível no momento. Tente novamente em instantes."
 LOJA_PADRAO = "DummyJSON"
 CATEGORIA = "Mercearia"
@@ -34,13 +37,17 @@ DIAS_POR_UNIDADE = {"business day": 1, "day": 1, "week": 7, "month": 30}
 
 
 class CatalogoDummyJson(Catalogo):
-    """Baixa a categoria groceries uma vez a cada 10 minutos e busca localmente."""
+    """Baixa a categoria groceries uma vez a cada 10 minutos e busca localmente.
+
+    Se a renovação falhar, continua usando as ofertas já baixadas; sem nenhuma, responde 502.
+    """
 
     def __init__(self, timeout=8, relogio=time.monotonic):
         self._timeout = timeout
         self._relogio = relogio
         self._ofertas = None
         self._baixado_em = None
+        self._falhou_em = None
 
     def buscar(self, termo, limite=10):
         procuradas = _traduzir(palavras_relevantes(termo))
@@ -51,19 +58,30 @@ class CatalogoDummyJson(Catalogo):
 
     def _indice(self):
         agora = self._relogio()
-        if self._ofertas is None or agora - self._baixado_em > VALIDADE_CACHE_SEGUNDOS:
-            produtos = self._baixar()
-            self._ofertas = [(_palavras_em_ingles(produto["title"]), _normalizar(produto))
-                             for produto in produtos if produto.get("stock")]
-            self._baixado_em = agora
+        if self._precisa_baixar(agora):
+            try:
+                self._ofertas = self._baixar()
+                self._baixado_em = agora
+                self._falhou_em = None
+            except ErroApi:
+                self._falhou_em = agora
+        if self._ofertas is None:
+            raise ErroApi(502, INDISPONIVEL)
         return self._ofertas
 
+    def _precisa_baixar(self, agora):
+        if self._falhou_em is not None and agora - self._falhou_em < PAUSA_APOS_FALHA_SEGUNDOS:
+            return False
+        return self._ofertas is None or agora - self._baixado_em > VALIDADE_CACHE_SEGUNDOS
+
     def _baixar(self):
+        """Pares (palavras em inglês, oferta) dos produtos em estoque; qualquer falha vira 502."""
         try:
             resposta = requests.get(URL_PRODUTOS, params={"limit": 100}, timeout=self._timeout)
             resposta.raise_for_status()
-            return resposta.json()["products"]
-        except (requests.RequestException, ValueError, KeyError, TypeError):
+            return [(_palavras_em_ingles(produto["title"]), _normalizar(produto))
+                    for produto in resposta.json()["products"] if produto.get("stock")]
+        except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError):
             raise ErroApi(502, INDISPONIVEL) from None
 
 

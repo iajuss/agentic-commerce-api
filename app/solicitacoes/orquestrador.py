@@ -13,7 +13,7 @@ from flask import current_app
 from app.erros import ErroApi
 from app.politicas.regras import avaliar_cesta, avaliar_oferta
 from app.solicitacoes.catalogo.base import sem_acentos
-from app.solicitacoes.medidas import extrair_medida
+from app.solicitacoes.medidas import embalagens_necessarias, extrair_medida
 from app.solicitacoes.ranking import FRETE_ESTIMADO, ranquear
 
 COM_OFERTA = "com_oferta"
@@ -111,14 +111,14 @@ def tentar_compra_automatica(solicitacao):
 
 
 def _processar_item(item, ofertas, politicas, preferencias, maior_de_idade):
-    quantidade = item["quantidade"]
     permitidas = []
     motivos = Counter()
     for oferta in ofertas:
         if not maior_de_idade and _eh_alcoolica(oferta):
             motivos[MOTIVO_IDADE] += 1
             continue
-        avaliacao = avaliar_oferta({**oferta, "preco": oferta["preco"] * quantidade}, politicas)
+        embalagens, _ = embalagens_necessarias(item["quantidade"], item["descricao"], oferta["titulo"])
+        avaliacao = avaliar_oferta({**oferta, "preco": oferta["preco"] * embalagens}, politicas)
         if not avaliacao.permitida:
             motivos["; ".join(avaliacao.motivos)] += 1
             continue
@@ -135,6 +135,10 @@ def _processar_item(item, ofertas, politicas, preferencias, maior_de_idade):
         return _item_sem_oferta(item, explicacao, descartadas=len(ofertas))
 
     ranqueadas = ranquear(permitidas, preferencias, medida_pedida=extrair_medida(item["descricao"]))
+    # A quantidade gravada é o número de embalagens da recomendada, que o M3 multiplica pelo preço.
+    quantidade, ajuste = embalagens_necessarias(item["quantidade"], item["descricao"], ranqueadas[0]["titulo"])
+    if ajuste:
+        explicacao.append(ajuste)
     return {
         "descricao": item["descricao"],
         "quantidade": quantidade,

@@ -11,11 +11,14 @@ from app.erros import ErroApi, ler_json
 from app.politicas import repositorio as repositorio_politicas
 from app.solicitacoes import repositorio
 from app.solicitacoes.auditoria import auditar
-from app.solicitacoes.catalogo import obter_catalogo
+from app.solicitacoes.catalogo import fabrica_do_provedor, obter_catalogo
 from app.solicitacoes.orquestrador import processar_solicitacao, tentar_compra_automatica
 from app.solicitacoes.validacao import validar_solicitacao
 
 bp = Blueprint("solicitacoes", __name__)
+# Confere CATALOGO_PROVEDOR ao registrar o blueprint: um provedor sem conector impede a API de subir, em vez de
+# quebrar cada POST /solicitacoes.
+bp.record_once(lambda estado: fabrica_do_provedor(estado.app.config))
 
 NAO_ENCONTRADA = "Solicitação não encontrada."
 NAO_CANCELAVEL = "Esta solicitação já foi aprovada e não pode ser cancelada."

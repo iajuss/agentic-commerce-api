@@ -109,7 +109,7 @@ def test_produto_sem_estoque_fica_de_fora(monkeypatch):
 @pytest.mark.parametrize("falha", [
     requests.Timeout("lento"), requests.ConnectionError("sem rede"), RespostaFalsa(status=500),
     RespostaFalsa(status=429), RespostaFalsa(corpo=ValueError("json inválido")),
-    RespostaFalsa(corpo={"outra": 1}),
+    RespostaFalsa(corpo={"outra": 1}), RespostaFalsa(corpo={"products": [{"id": 1, "stock": 5}]}),
 ])
 def test_falha_da_dummyjson_vira_502(monkeypatch, falha):
     def get_falso(url, **kwargs):
@@ -124,6 +124,73 @@ def test_falha_da_dummyjson_vira_502(monkeypatch, falha):
 
     assert erro.value.status == 502
     assert erro.value.mensagem == dummyjson.INDISPONIVEL
+
+
+@pytest.fixture
+def fora_do_ar(monkeypatch):
+    """requests.get que sempre estoura o timeout; devolve a lista de tentativas."""
+    tentativas = []
+
+    def get_falso(url, **kwargs):
+        tentativas.append(url)
+        raise requests.Timeout("lento")
+
+    monkeypatch.setattr(dummyjson.requests, "get", get_falso)
+    return tentativas
+
+
+def test_depois_de_uma_falha_nao_tenta_de_novo_a_cada_busca(fora_do_ar):
+    catalogo = CatalogoDummyJson(relogio=lambda: 0.0)
+
+    for termo in ("arroz", "leite", "ovos"):
+        with pytest.raises(ErroApi):
+            catalogo.buscar(termo)
+
+    assert len(fora_do_ar) == 1
+
+
+def test_tenta_de_novo_depois_da_pausa(fora_do_ar):
+    instante = [0.0]
+    catalogo = CatalogoDummyJson(relogio=lambda: instante[0])
+    with pytest.raises(ErroApi):
+        catalogo.buscar("arroz")
+
+    instante[0] = dummyjson.PAUSA_APOS_FALHA_SEGUNDOS
+    with pytest.raises(ErroApi):
+        catalogo.buscar("arroz")
+
+    assert len(fora_do_ar) == 2
+
+
+def test_falha_ao_renovar_mantem_as_ofertas_ja_baixadas(monkeypatch):
+    respostas = [RespostaFalsa(), requests.ConnectionError("sem rede")]
+
+    def get_falso(url, **kwargs):
+        resposta = respostas.pop(0)
+        if isinstance(resposta, Exception):
+            raise resposta
+        return resposta
+
+    monkeypatch.setattr(dummyjson.requests, "get", get_falso)
+    instante = [0.0]
+    catalogo = CatalogoDummyJson(relogio=lambda: instante[0])
+    catalogo.buscar("arroz")
+    instante[0] = dummyjson.VALIDADE_CACHE_SEGUNDOS + 1
+
+    ofertas = catalogo.buscar("arroz")
+
+    assert respostas == []
+    assert [oferta["titulo"] for oferta in ofertas] == ["Rice"]
+
+
+def test_solicitacao_com_a_dummyjson_fora_do_ar_tenta_baixar_uma_vez(app, client, auth, fora_do_ar):
+    app.config["CATALOGO_PROVEDOR"] = "dummyjson"
+    itens = [{"descricao": termo, "quantidade": 1} for termo in ("arroz", "leite", "ovos", "café", "óleo")]
+
+    resposta = client.post("/solicitacoes", json={"itens": itens}, headers=auth)
+
+    assert resposta.status_code == 502
+    assert len(fora_do_ar) == 1
 
 
 def test_provedor_dummyjson_usa_o_timeout_da_configuracao(app, chamadas):

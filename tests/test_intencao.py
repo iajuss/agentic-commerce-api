@@ -20,6 +20,8 @@ def item(descricao, quantidade=1):
     ("feijão", [item("feijão")]),
     ("12 rolos de papel higiênico", [item("12 rolos de papel higiênico")]),
     ("2 kg de feijão", [item("2 kg de feijão")]),
+    ("2 quilos de feijão", [item("2 quilos de feijão")]),
+    ("2 dúzias de ovos", [item("dúzias de ovos", 2)]),
     ("6 latas de cerveja\n2 refrigerantes", [item("latas de cerveja", 6), item("refrigerantes", 2)]),
     ("leite; Leite, LEITE", [item("leite", 3)]),
     ("café, cafe", [item("café", 2)]),
