@@ -8,10 +8,16 @@ from datetime import datetime, timedelta, timezone
 
 COM_OFERTA = "com_oferta"
 CAMPOS_DA_OFERTA = ("id_externo", "titulo", "preco", "loja")
+AGUARDANDO_PAGAMENTO = "aguardando_pagamento"
+PAGO = "pago"
+CAMPOS_DO_PEDIDO = ("solicitacao_id", "autorizacao_id", "status", "itens", "total", "pix", "historico", "entrega",
+                    "criado_em")
 
 
 def agora():
-    return datetime.now(timezone.utc)
+    """UTC com milissegundos inteiros, a precisão do BSON: a resposta do POST e a do GET mostram a mesma data."""
+    momento = datetime.now(timezone.utc)
+    return momento.replace(microsecond=momento.microsecond // 1000 * 1000)
 
 
 def itens_autorizados(solicitacao):
@@ -37,4 +43,39 @@ def montar_autorizacao(solicitacao, origem, momento, validade_minutos):
         "expira_em": momento + timedelta(minutes=validade_minutos),
         "criada_em": momento,
         "atualizada_em": momento,
+    }
+
+
+def montar_pedido(autorizacao, cobranca, momento):
+    """Pedido da autorização consumida: os mesmos itens e o valor autorizado, à espera do Pix."""
+    return {
+        "usuario_id": autorizacao["usuario_id"],
+        "solicitacao_id": autorizacao["solicitacao_id"],
+        "autorizacao_id": autorizacao["_id"],
+        "status": AGUARDANDO_PAGAMENTO,
+        "itens": [dict(item) for item in autorizacao["itens"]],
+        "total": autorizacao["valor_maximo"],
+        "pix": cobranca,
+        "historico": [{"status": AGUARDANDO_PAGAMENTO, "em": momento}],
+        "entrega": {"simulada": True},
+        "criado_em": momento,
+        "atualizado_em": momento,
+    }
+
+
+def pedido_para_json(pedido):
+    """Formato da seção 10 do contrato (sem o dono); `reembolso` só aparece quando existe."""
+    corpo = {"id": pedido["_id"], **{campo: pedido[campo] for campo in CAMPOS_DO_PEDIDO}}
+    if pedido.get("reembolso"):
+        corpo["reembolso"] = pedido["reembolso"]
+    return corpo
+
+
+def resumo_do_pedido(pedido):
+    return {
+        "id": pedido["_id"],
+        "status": pedido["status"],
+        "total": pedido["total"],
+        "quantidade_itens": sum(item["quantidade"] for item in pedido["itens"]),
+        "criado_em": pedido["criado_em"],
     }

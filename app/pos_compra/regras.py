@@ -8,4 +8,6 @@ from datetime import datetime, timezone
 
 
 def agora():
-    return datetime.now(timezone.utc)
+    """UTC com milissegundos inteiros, a precisão do BSON: a resposta e a próxima leitura mostram a mesma data."""
+    momento = datetime.now(timezone.utc)
+    return momento.replace(microsecond=momento.microsecond // 1000 * 1000)

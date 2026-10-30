@@ -1,13 +1,16 @@
 """Casos de uso do pagamento, compartilhados pelas rotas e pela compra automática."""
 
+from datetime import timedelta
+
 from flask import current_app
 
 from app.erros import ErroApi
-from app.pagamento import regras, repositorio_autorizacoes, repositorio_contrato
+from app.pagamento import pix, regras, repositorio_autorizacoes, repositorio_contrato, repositorio_pedidos
 from app.pagamento.auditoria import auditar
 
 AGUARDANDO_APROVACAO = "aguardando_aprovacao"
 APROVADA = "aprovada"
+CONCLUIDA = "concluida"
 
 
 def emitir_autorizacao(usuario_id, solicitacao, origem):
@@ -41,3 +44,51 @@ def revogar_autorizacao(usuario_id, autorizacao_id):
     repositorio_contrato.mudar_status_solicitacao(usuario_id, revogada["solicitacao_id"], APROVADA,
                                                   AGUARDANDO_APROVACAO)
     auditar(usuario_id, "autorizacao_revogada", "autorizacao", autorizacao_id)
+
+
+def consumir_autorizacao(usuario_id, autorizacao_id):
+    """Marca a autorização como usada (uso único) e a devolve.
+
+    404 se não existe ou é de outro usuário; 409 se venceu, foi revogada ou já foi usada.
+    """
+    autorizacao = repositorio_autorizacoes.consumir(usuario_id, autorizacao_id, regras.agora())
+    if autorizacao is None:
+        if repositorio_autorizacoes.obter(usuario_id, autorizacao_id) is None:
+            raise ErroApi(404, "Autorização não encontrada.")
+        raise ErroApi(409, "Autorização expirada, revogada ou já usada.")
+    return autorizacao
+
+
+def criar_pedido(usuario_id, autorizacao):
+    """Cria o pedido da autorização já consumida, com a cobrança Pix simulada."""
+    momento = regras.agora()
+    minutos = int(current_app.config.get("PIX_EXPIRACAO_MINUTOS", 30))
+    expira_em = momento + timedelta(minutes=minutos)
+    cobranca = pix.criar_cobranca(pix.novo_txid(), autorizacao["valor_maximo"], expira_em)
+    pedido = repositorio_pedidos.criar(regras.montar_pedido(autorizacao, cobranca, momento))
+    auditar(usuario_id, "pedido_criado", "pedido", pedido["_id"], {"total": pedido["total"]})
+    return pedido
+
+
+def confirmar_pagamento(usuario_id, txid):
+    """Simula o Pix pago: o pedido vai para `pago` e a solicitação para `concluida`."""
+    pedido = repositorio_pedidos.obter_por_txid(usuario_id, txid)
+    if pedido is None:
+        raise ErroApi(404, "Cobrança Pix não encontrada.")
+    if pedido["status"] != regras.AGUARDANDO_PAGAMENTO:
+        raise ErroApi(409, "Este pedido não está aguardando pagamento.")
+
+    momento = regras.agora()
+    pago = repositorio_pedidos.mudar_status(
+        usuario_id, pedido["_id"], regras.AGUARDANDO_PAGAMENTO, regras.PAGO, momento,
+        campos={"pix.pago_em": momento}, condicao={"pix.expira_em": {"$gt": momento}},
+    )
+    if pago is None:
+        atual = repositorio_pedidos.obter(usuario_id, pedido["_id"])
+        if atual["status"] == regras.AGUARDANDO_PAGAMENTO:
+            raise ErroApi(409, "Esta cobrança Pix expirou.")
+        raise ErroApi(409, "Este pedido não está aguardando pagamento.")
+
+    repositorio_contrato.mudar_status_solicitacao(usuario_id, pago["solicitacao_id"], APROVADA, CONCLUIDA)
+    auditar(usuario_id, "pagamento_confirmado", "pedido", pago["_id"], {"total": pago["total"]})
+    return pago

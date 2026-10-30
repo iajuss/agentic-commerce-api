@@ -31,6 +31,15 @@ def listar_ativas(usuario_id, agora):
     return list(_colecao().find(filtro).sort([("criada_em", -1), ("_id", -1)]))
 
 
+def consumir(usuario_id, autorizacao_id, agora):
+    """Uso único: marca como usada só se estiver ativa e no prazo. Devolve a autorização ou None."""
+    return _colecao().find_one_and_update(
+        {"_id": autorizacao_id, "usuario_id": usuario_id, "status": ATIVA, "expira_em": {"$gt": agora}},
+        {"$set": {"status": USADA, "usada_em": agora, "atualizada_em": agora}},
+        return_document=ReturnDocument.AFTER,
+    )
+
+
 def revogar(usuario_id, autorizacao_id, agora):
     """Revoga só se estiver ativa. Devolve a autorização revogada ou None se nada mudou."""
     return _colecao().find_one_and_update(
