@@ -93,3 +93,21 @@ def devolucao_no_prazo(pedido, agora):
 def reembolso(pedido, momento):
     """Reembolso simulado do valor total do pedido."""
     return {"valor": pedido["total"], "status": "simulado", "em": momento}
+
+
+def montar_chamado(usuario_id, pedido_id, assunto, mensagem, momento):
+    return {
+        "usuario_id": usuario_id,
+        "pedido_id": pedido_id,
+        "assunto": assunto,
+        "mensagem": mensagem,
+        "status": "aberto",
+        "criado_em": momento,
+        "atualizado_em": momento,
+    }
+
+
+def chamado_para_json(chamado):
+    """O chamado sem o dono, como o comprovante do pedido."""
+    return {"id": chamado["_id"], **{campo: valor for campo, valor in chamado.items()
+                                     if campo not in ("_id", "usuario_id")}}
