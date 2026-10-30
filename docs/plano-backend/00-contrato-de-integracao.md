@@ -84,7 +84,7 @@ Blueprints: as rotas do M3 ficam em `app/pagamento/rotas.py` (autorizações, `P
 | `solicitacoes` | M2 (documento inteiro); M3 (**só** `status` e `atualizada_em`, ver seção 5) | M2, M3 | Esquema na seção 4 |
 | `autorizacoes`, `pedidos`, `chamados` | M3 | M3 | Internas do M3 |
 | `auditoria` | M1, pelo gancho `registrar_evento` | M1 | Só inserção; nunca alterar nem apagar |
-| `integracoes` | M2 | M2 | Tokens do Mercado Livre; nunca expostos pela API |
+| `integracoes` | M2 | M2 | Tokens do Mercado Livre; nunca expostos pela API. Fora do MVP: só existe com o conector `mercadolivre` (o spike M2-01 escolheu a opção C) |
 
 **Esquema de `usuarios`** (o M1 garante): `_id`, `nome`, `email` (minúsculo), `senha_hash`, `criado_em` (já existem);
 o M1-04 acrescenta `data_nascimento` (texto `AAAA-MM-DD`), `endereco` {`cep`, `logradouro`, `numero`, `complemento`,
@@ -133,6 +133,8 @@ decrescente).
 - Oferta: os campos obrigatórios são `id_externo`, `fonte`, `titulo`, `preco`, `categoria`, `categorias_caminho` e
   `loja`; os demais podem ser `null` quando a fonte não informa. `marca` alimenta as marcas preferidas e evitadas do
   perfil; `estoque` é a quantidade disponível (aproximada quando a fonte só informa faixas).
+- `fonte` no MVP é `fixo` (catálogo local) ou `dummyjson` (catálogo externo); `mercadolivre` fica para depois do MVP.
+  O exemplo acima mostra o formato que o conector do Mercado Livre vai ter.
 - `texto` é `null` quando a solicitação chega com `itens` já separados.
 - `itens[].quantidade` é o número de embalagens da `recomendada` a comprar, o mesmo que entra em `cesta.subtotal`.
   O M2 ajusta a quantidade pedida ao tamanho da embalagem: "2 kg de feijão" com a oferta de 1 kg vira
@@ -246,9 +248,9 @@ O M1 carrega todas as chaves em `app/config.py` (M1-01), lendo do `.env` e conve
 | `CORS_ORIGINS` | `http://localhost:5173` | M1 | Origens do front |
 | `HTTP_TIMEOUT_SEGUNDOS` | `8` | M1, M2 | Timeout de ViaCEP e catálogo |
 | `PROXY_FIX` | `0` | M1 | `1` na EC2, atrás do nginx (gera `Location` com `/api`) |
-| `CATALOGO_PROVEDOR` | `fixo` | M2 | `fixo`, `mercadolivre` ou `dummyjson` |
-| `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `ML_REDIRECT_URI`, `ML_REFRESH_TOKEN` | vazio | M2 | App do Mercado Livre (só com `mercadolivre`) |
-| `ML_VENDEDORES` | vazio | M2 | IDs de vendedores, se o spike escolher busca por vendedor |
+| `CATALOGO_PROVEDOR` | `fixo` | M2 | `fixo`, `dummyjson` ou `combinado` (fixo + DummyJSON no mesmo ranking: o da demonstração e da produção). `mercadolivre` fica para depois do MVP e, até lá, impede a API de subir |
+| `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `ML_REDIRECT_URI`, `ML_REFRESH_TOKEN` | vazio | M2 | App do Mercado Livre (só com `mercadolivre`; fora do MVP, ficam vazias) |
+| `ML_VENDEDORES` | vazio | M2 | IDs de vendedores, se o spike escolher busca por vendedor (fora do MVP) |
 | `PIX_EXPIRACAO_MINUTOS` | `30` | M3 | Validade da cobrança Pix |
 | `AUTORIZACAO_VALIDADE_MINUTOS` | `15` | M3 | Validade da autorização limitada |
 | `SIMULACAO_ENVIO_MINUTOS`, `SIMULACAO_ENTREGA_MINUTOS` | `2`, `5` | M3 | Ritmo do envio e da entrega simulados |
@@ -263,6 +265,7 @@ O M1 carrega todas as chaves em `app/config.py` (M1-01), lendo do `.env` e conve
 |---|---|---|
 | 27/10/2026 | Versão inicial do contrato do MVP | — |
 | 27/10/2026 | Seção 4: oferta com `marca` e `estoque`, `texto` nulo quando vierem `itens` e `itens[].quantidade` = embalagens a comprar. Seção 10: corpo de `POST /solicitacoes` e resumo de `GET /solicitacoes` | pendente (3 devs) |
+| 30/10/2026 | Opção C do spike M2-01 (MVP sem a API do Mercado Livre). Seção 8: `CATALOGO_PROVEDOR=combinado`; `mercadolivre` e as chaves `ML_*` ficam fora do MVP. Seção 3: `integracoes` fora do MVP. Seção 4: valores de `fonte` | pendente (3 devs) |
 
 ## 10. Exemplos de resposta para o front
 
