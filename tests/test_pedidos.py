@@ -152,6 +152,18 @@ def test_autorizacao_vencida_responde_409(app, client, cabecalho, usuario_id, re
     assert app.extensions["mongo"]["pedidos"].count_documents({}) == 0
 
 
+def test_pedido_com_autorizacao_vencida_devolve_a_solicitacao_para_aprovacao(app, client, cabecalho, usuario_id,
+                                                                             relogio):
+    solicitacao, autorizacao = _autorizar(app, client, cabecalho, usuario_id)
+    relogio.avancar(minutes=15)
+
+    _pedir(client, cabecalho, autorizacao["id"])
+
+    gravada = app.extensions["mongo"]["autorizacoes"].find_one({"_id": ObjectId(autorizacao["id"])})
+    assert gravada["status"] == "expirada"
+    assert _status_da_solicitacao(app, solicitacao) == "aguardando_aprovacao"
+
+
 def test_autorizacao_revogada_responde_409(app, client, cabecalho, usuario_id):
     _, autorizacao = _autorizar(app, client, cabecalho, usuario_id)
     client.delete(f"/autorizacoes/{autorizacao['id']}", headers=cabecalho)

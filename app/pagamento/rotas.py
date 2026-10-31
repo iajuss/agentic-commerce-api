@@ -12,13 +12,17 @@ from app.banco import documento_para_json, para_object_id
 from app.erros import ErroApi, ler_json
 from app.pagamento import regras, repositorio_autorizacoes, repositorio_contrato, repositorio_pedidos, servicos
 from app.pagamento.auditoria import auditar
-from app.pagamento.servicos import executar_compra_automatica
+from app.pagamento.servicos import executar_compra_automatica, expirar_autorizacoes_vencidas
 from app.pagamento.validacao import validar_aprovacao, validar_pagamento_simulado, validar_pedido
 from app.pos_compra.servicos import aplicar_transicoes
 
 bp = Blueprint("pagamento", __name__)
 # Gancho da compra automática para o M2 (seção 6.2 do contrato).
 bp.record_once(lambda estado: estado.app.extensions.setdefault("compra_automatica", executar_compra_automatica))
+# Gancho que expira autorizações vencidas sem pedido; o M2 chama antes de ler solicitações (seção 6.3).
+bp.record_once(
+    lambda estado: estado.app.extensions.setdefault("expirar_autorizacoes", expirar_autorizacoes_vencidas)
+)
 
 SOLICITACAO_NAO_ENCONTRADA = "Solicitação não encontrada."
 AUTORIZACAO_NAO_ENCONTRADA = "Autorização não encontrada."
@@ -29,8 +33,10 @@ AUTORIZACAO_NAO_ENCONTRADA = "Autorização não encontrada."
 def criar_autorizacao(solicitacao_id):
     senha = validar_aprovacao(ler_json())
     usuario_id = usuario_atual_id()
+    solicitacao_id = para_object_id(solicitacao_id)
 
-    solicitacao = repositorio_contrato.obter_solicitacao(usuario_id, para_object_id(solicitacao_id))
+    expirar_autorizacoes_vencidas(usuario_id, solicitacao_id)  # a vencida libera nova aprovação
+    solicitacao = repositorio_contrato.obter_solicitacao(usuario_id, solicitacao_id)
     if solicitacao is None:
         raise ErroApi(404, SOLICITACAO_NAO_ENCONTRADA)
     if solicitacao["status"] != servicos.AGUARDANDO_APROVACAO:
@@ -53,14 +59,19 @@ def criar_autorizacao(solicitacao_id):
 @bp.get("/autorizacoes")
 @jwt_required()
 def listar_autorizacoes():
-    autorizacoes = repositorio_autorizacoes.listar_ativas(usuario_atual_id(), regras.agora())
+    usuario_id = usuario_atual_id()
+    expirar_autorizacoes_vencidas(usuario_id)
+    autorizacoes = repositorio_autorizacoes.listar_ativas(usuario_id, regras.agora())
     return jsonify([documento_para_json(autorizacao) for autorizacao in autorizacoes])
 
 
 @bp.get("/autorizacoes/<autorizacao_id>")
 @jwt_required()
 def obter_autorizacao(autorizacao_id):
-    autorizacao = repositorio_autorizacoes.obter(usuario_atual_id(), para_object_id(autorizacao_id))
+    usuario_id = usuario_atual_id()
+    autorizacao_id = para_object_id(autorizacao_id)
+    expirar_autorizacoes_vencidas(usuario_id)  # mostra `expirada` em vez de uma `ativa` vencida
+    autorizacao = repositorio_autorizacoes.obter(usuario_id, autorizacao_id)
     if autorizacao is None:
         raise ErroApi(404, AUTORIZACAO_NAO_ENCONTRADA)
     return jsonify(documento_para_json(autorizacao))

@@ -5,6 +5,7 @@ from datetime import timedelta
 import pytest
 from bson import ObjectId
 
+from app.pagamento.servicos import expirar_autorizacoes_vencidas
 from tests.apoio_pagamento import (  # noqa: F401
     SENHA_PADRAO,
     eventos,
@@ -358,3 +359,114 @@ def test_revogar_autorizacao_de_outro_usuario_responde_404(app, client, cabecalh
 
 def test_revogar_inexistente_responde_404(client, cabecalho):
     assert client.delete(f"/autorizacoes/{ObjectId()}", headers=cabecalho).status_code == 404
+
+
+# Autorização vencida sem pedido (seções 5 e 6.3 do contrato)
+
+
+def test_gancho_expirar_autorizacoes_esta_registrado(app):
+    assert app.extensions["expirar_autorizacoes"] is expirar_autorizacoes_vencidas
+
+
+def test_autorizacao_vencida_fica_expirada_e_a_solicitacao_volta_a_aguardar(app, client, cabecalho, usuario_id,
+                                                                            relogio):
+    solicitacao = inserir_solicitacao(app, usuario_id)
+    _aprovar(client, cabecalho, solicitacao)
+    relogio.avancar(minutes=16)
+
+    assert client.get("/autorizacoes", headers=cabecalho).get_json() == []
+
+    autorizacao = _autorizacoes_no_banco(app)[0]
+    assert autorizacao["status"] == "expirada"
+    assert autorizacao["expirada_em"] == autorizacao["expira_em"]
+    assert _solicitacao_no_banco(app, solicitacao)["status"] == "aguardando_aprovacao"
+
+
+def test_autorizacao_no_prazo_continua_ativa(app, client, cabecalho, usuario_id, relogio):
+    solicitacao = inserir_solicitacao(app, usuario_id)
+    _aprovar(client, cabecalho, solicitacao)
+    relogio.avancar(minutes=14)
+
+    client.get("/autorizacoes", headers=cabecalho)
+
+    assert _autorizacoes_no_banco(app)[0]["status"] == "ativa"
+    assert _solicitacao_no_banco(app, solicitacao)["status"] == "aprovada"
+
+
+def test_obter_autorizacao_vencida_mostra_expirada(app, client, cabecalho, usuario_id, relogio):
+    criada = _aprovar(client, cabecalho, inserir_solicitacao(app, usuario_id)).get_json()
+    relogio.avancar(minutes=16)
+
+    resposta = client.get(f"/autorizacoes/{criada['id']}", headers=cabecalho)
+
+    assert resposta.status_code == 200
+    assert resposta.get_json()["status"] == "expirada"
+
+
+def test_solicitacao_com_autorizacao_vencida_pode_ser_aprovada_de_novo(app, client, cabecalho, usuario_id, relogio):
+    solicitacao = inserir_solicitacao(app, usuario_id)
+    _aprovar(client, cabecalho, solicitacao)
+    relogio.avancar(minutes=16)
+
+    resposta = _aprovar(client, cabecalho, solicitacao)
+
+    assert resposta.status_code == 201
+    assert [autorizacao["status"] for autorizacao in _autorizacoes_no_banco(app)] == ["expirada", "ativa"]
+    assert _solicitacao_no_banco(app, solicitacao)["status"] == "aprovada"
+
+
+def test_expiracao_emite_um_evento_mesmo_com_leituras_repetidas(app, client, cabecalho, usuario_id, relogio,
+                                                                 eventos):
+    criada = _aprovar(client, cabecalho, inserir_solicitacao(app, usuario_id)).get_json()
+    relogio.avancar(minutes=16)
+
+    client.get("/autorizacoes", headers=cabecalho)
+    client.get("/autorizacoes", headers=cabecalho)
+    client.get(f"/autorizacoes/{criada['id']}", headers=cabecalho)
+
+    expiradas = [evento for evento in eventos if evento["tipo"] == "autorizacao_expirada"]
+    assert expiradas == [{"usuario_id": usuario_id, "tipo": "autorizacao_expirada", "recurso_tipo": "autorizacao",
+                          "recurso_id": ObjectId(criada["id"]), "dados": None}]
+
+
+def test_gancho_expira_so_a_solicitacao_pedida(app, client, cabecalho, usuario_id, relogio):
+    primeira = inserir_solicitacao(app, usuario_id)
+    segunda = inserir_solicitacao(app, usuario_id)
+    _aprovar(client, cabecalho, primeira)
+    _aprovar(client, cabecalho, segunda)
+    relogio.avancar(minutes=16)
+
+    with app.app_context():
+        app.extensions["expirar_autorizacoes"](usuario_id, primeira["_id"])
+
+    assert _solicitacao_no_banco(app, primeira)["status"] == "aguardando_aprovacao"
+    assert _solicitacao_no_banco(app, segunda)["status"] == "aprovada"
+
+
+def test_expiracao_nao_mexe_nas_autorizacoes_de_outro_usuario(app, client, cabecalho_de, relogio):
+    dono = inserir_usuario(app)
+    outro = inserir_usuario(app)
+    solicitacao = inserir_solicitacao(app, dono)
+    _aprovar(client, cabecalho_de(dono), solicitacao)
+    relogio.avancar(minutes=16)
+
+    client.get("/autorizacoes", headers=cabecalho_de(outro))
+
+    assert _autorizacoes_no_banco(app)[0]["status"] == "ativa"
+    assert _solicitacao_no_banco(app, solicitacao)["status"] == "aprovada"
+
+
+def test_revogar_autorizacao_ja_expirada_responde_204_sem_mudar_nada(app, client, cabecalho, usuario_id, relogio,
+                                                                     eventos):
+    solicitacao = inserir_solicitacao(app, usuario_id)
+    criada = _aprovar(client, cabecalho, solicitacao).get_json()
+    relogio.avancar(minutes=16)
+    client.get("/autorizacoes", headers=cabecalho)  # aplica a expiração
+    eventos.clear()
+
+    resposta = client.delete(f"/autorizacoes/{criada['id']}", headers=cabecalho)
+
+    assert resposta.status_code == 204
+    assert _autorizacoes_no_banco(app)[0]["status"] == "expirada"
+    assert _solicitacao_no_banco(app, solicitacao)["status"] == "aguardando_aprovacao"
+    assert eventos == []
