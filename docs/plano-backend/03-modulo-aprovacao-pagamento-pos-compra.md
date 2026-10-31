@@ -56,7 +56,7 @@ Branch `feat/m3-base` · Quarta
   - `inserir_solicitacao(app, usuario_id, status="aguardando_aprovacao", permitida=True, compra_automatica=False,
     total=33.8)`: monta um documento **idêntico** ao da seção 4 do contrato, com 2 itens `com_oferta`.
 **Aceite:**
-- [ ] Os auxiliares produzem documentos que batem campo a campo com o contrato (um teste compara as chaves).
+- [x] Os auxiliares produzem documentos que batem campo a campo com o contrato (um teste compara as chaves).
 
 ## M3-02 — Autorizações com reautenticação
 Branch `feat/m3-autorizacoes` · Quarta–quinta · Rotas em `app/pagamento/rotas.py`
@@ -214,6 +214,6 @@ Branch: a da última tarefa ou `chore/m3-contrato` · Sexta
 - `docs/postman/pagamento-pos-compra.postman_collection.json`: as 12 rotas com exemplos, guardando `autorizacaoId`,
   `pedidoId`, `txid` e `chamadoId` como variáveis da coleção.
 **Aceite:**
-- [ ] Suíte inteira verde, sem rede.
-- [ ] Toda transição de status do pedido e da solicitação coberta por teste.
-- [ ] Nenhum teste depende de código do M1 ou do M2.
+- [x] Suíte inteira verde, sem rede.
+- [x] Toda transição de status do pedido e da solicitação coberta por teste.
+- [x] Nenhum teste depende de código do M1 ou do M2.

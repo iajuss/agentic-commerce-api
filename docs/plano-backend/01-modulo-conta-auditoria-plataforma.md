@@ -44,9 +44,9 @@ flask-jwt-extended) e o front desloga o usuário a cada 15 minutos.
 - com `PROXY_FIX=1` e o cabeçalho `X-Forwarded-Prefix: /api`, `POST /politicas` devolve `Location: /api/politicas/<id>`;
 - provedor desconhecido → `RuntimeError`.
 **Aceite:**
-- [ ] Os 48 testes atuais continuam passando.
-- [ ] Token válido por 8 h.
-- [ ] Todas as chaves do contrato estão no `Config`.
+- [x] Os 48 testes atuais continuam passando.
+- [x] Token válido por 8 h.
+- [x] Todas as chaves do contrato estão no `Config`.
 
 ## M1-02 — Índices no boot
 Branch `chore/m1-indices` · Quarta
@@ -57,7 +57,7 @@ Branch `chore/m1-indices` · Quarta
 **Testes:** dois usuários com o mesmo e-mail → `DuplicateKeyError` (o mongomock respeita índice único); chamar
 `criar_indices` duas vezes não falha; `test_cadastro_duplicado_ignora_maiusculas` continua passando.
 **Aceite:**
-- [ ] Nenhum repositório cria índice.
+- [x] Nenhum repositório cria índice.
 
 ## M1-03 — Auditoria e gancho `registrar_evento`
 Branch `feat/m1-auditoria` · Quarta–quinta
@@ -88,7 +88,7 @@ Branch `feat/m1-auditoria` · Quarta–quinta
 - o gancho existe em `app.extensions`;
 - há um evento depois de cadastro, login certo, login errado e de cada operação de política.
 **Aceite:**
-- [ ] O gancho funciona para M2 e M3 sem que eles importem nada do M1.
+- [x] O gancho funciona para M2 e M3 sem que eles importem nada do M1.
 
 ## M1-04 — Perfil `GET/PATCH /usuarios/me` com ViaCEP
 Branch `feat/m1-perfil-viacep` · Quinta · Rubrica: API externa
@@ -129,8 +129,8 @@ Branch `feat/m1-perfil-viacep` · Quinta · Rubrica: API externa
 - `data_nascimento` futura → 400;
 - o perfil é sempre o do token.
 **Aceite:**
-- [ ] Nenhum teste acessa o ViaCEP de verdade.
-- [ ] Cadastro e login continuam com o mesmo formato de resposta.
+- [x] Nenhum teste acessa o ViaCEP de verdade.
+- [x] Cadastro e login continuam com o mesmo formato de resposta.
 
 ## M1-05 — Refatoração de cadastro e login (desejável)
 Branch `fix/m1-ajustes-autenticacao` · Quinta–sexta, se o resto estiver em dia
@@ -143,8 +143,8 @@ Branch `fix/m1-ajustes-autenticacao` · Quinta–sexta, se o resto estiver em di
   cadastrados.
 - Quebrar as linhas 57 e 99 de `tests/test_autenticacao.py` (mais de 115 colunas).
 **Aceite:**
-- [ ] Os testes atuais de autenticação passam sem mudar as asserções.
-- [ ] Novo teste confirma que `check_password_hash` é chamado mesmo com e-mail inexistente.
+- [x] Os testes atuais de autenticação passam sem mudar as asserções.
+- [x] Novo teste confirma que `check_password_hash` é chamado mesmo com e-mail inexistente.
 
 ## M1-06 — Guarda-corpos de teste
 Branch `chore/m1-guarda-corpos` · Sexta
@@ -156,8 +156,8 @@ Branch `chore/m1-guarda-corpos` · Sexta
 - `tests/test_contrato_conta.py`: as rotas do M1 no contrato existem no `app.url_map`; as públicas são exatamente as de
   `ENDPOINTS_PUBLICOS`; as demais respondem `401` sem token.
 **Aceite:**
-- [ ] Suíte inteira verde.
-- [ ] Um teste que tente acessar a rede falha com a mensagem acima.
+- [x] Suíte inteira verde.
+- [x] Um teste que tente acessar a rede falha com a mensagem acima.
 
 ## M1-07 — Deploy na EC2
 Branch `feat/m1-deploy-ec2` · Sexta (sobe o que já estiver no `main`; no sábado entra o resto) · Rubrica: EC2 e Atlas
