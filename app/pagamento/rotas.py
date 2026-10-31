@@ -1,6 +1,7 @@
 """Aprovação e pagamento: POST /solicitacoes/<id>/autorizacoes, /autorizacoes e /pedidos.
 
-Atenção, front: em POST /solicitacoes/<id>/autorizacoes, 401 significa senha errada, não sessão expirada.
+Atenção, front: em POST /solicitacoes/<id>/autorizacoes, o 401 de senha errada traz `detalhes.senha` e não significa
+sessão expirada; um 401 sem `detalhes` é sessão inválida (seção 10 do contrato).
 """
 
 from flask import Blueprint, jsonify, url_for
@@ -26,6 +27,8 @@ bp.record_once(
 
 SOLICITACAO_NAO_ENCONTRADA = "Solicitação não encontrada."
 AUTORIZACAO_NAO_ENCONTRADA = "Autorização não encontrada."
+SENHA_INCORRETA = "Senha incorreta."
+SESSAO_INVALIDA = "Sessão inválida. Faça login novamente."
 
 
 @bp.post("/solicitacoes/<solicitacao_id>/autorizacoes")
@@ -43,9 +46,12 @@ def criar_autorizacao(solicitacao_id):
         raise ErroApi(409, "Esta solicitação não está aguardando aprovação.")
 
     senha_hash = repositorio_contrato.senha_hash(usuario_id)
-    if not senha_hash or not check_password_hash(senha_hash, senha):
+    if not senha_hash:
+        raise ErroApi(401, SESSAO_INVALIDA)  # sem detalhes: o front encerra a sessão
+    if not check_password_hash(senha_hash, senha):
         auditar(usuario_id, "reautenticacao_recusada", "solicitacao", solicitacao["_id"])
-        raise ErroApi(401, "Senha incorreta.")
+        # Com detalhes.senha o front mantém a sessão e pede a senha de novo.
+        raise ErroApi(401, SENHA_INCORRETA, {"senha": "Senha incorreta. Confira e tente de novo."})
 
     avaliacao = solicitacao["avaliacao"]
     if not avaliacao["permitida"]:

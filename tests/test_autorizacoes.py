@@ -126,9 +126,18 @@ def test_senha_errada_responde_401_sem_criar_autorizacao(app, client, cabecalho,
     resposta = _aprovar(client, cabecalho, solicitacao, senha="senha-errada")
 
     assert resposta.status_code == 401
-    assert resposta.get_json() == {"erro": "Senha incorreta."}
+    assert resposta.get_json()["erro"] == "Senha incorreta."
     assert _autorizacoes_no_banco(app) == []
     assert _solicitacao_no_banco(app, solicitacao)["status"] == "aguardando_aprovacao"
+
+
+def test_senha_errada_traz_detalhes_senha_para_o_front_manter_a_sessao(app, client, cabecalho, usuario_id):
+    solicitacao = inserir_solicitacao(app, usuario_id)
+
+    resposta = _aprovar(client, cabecalho, solicitacao, senha="senha-errada")
+
+    assert resposta.get_json() == {"erro": "Senha incorreta.",
+                                   "detalhes": {"senha": "Senha incorreta. Confira e tente de novo."}}
 
 
 def test_senha_errada_emite_reautenticacao_recusada(app, client, cabecalho, usuario_id, eventos):
@@ -140,14 +149,16 @@ def test_senha_errada_emite_reautenticacao_recusada(app, client, cabecalho, usua
                         "recurso_id": solicitacao["_id"], "dados": None}]
 
 
-def test_usuario_sem_cadastro_recebe_senha_incorreta(app, client, cabecalho_de):
+def test_usuario_sem_cadastro_recebe_sessao_invalida_sem_detalhes(app, client, cabecalho_de, eventos):
     sem_cadastro = ObjectId()  # token válido, mas sem documento em usuarios
     solicitacao = inserir_solicitacao(app, sem_cadastro)
 
     resposta = _aprovar(client, cabecalho_de(sem_cadastro), solicitacao)
 
+    # Sem detalhes.senha o front encerra a sessão, que é o certo para um usuário que não existe mais.
     assert resposta.status_code == 401
-    assert resposta.get_json()["erro"] == "Senha incorreta."
+    assert resposta.get_json() == {"erro": "Sessão inválida. Faça login novamente."}
+    assert eventos == []
 
 
 @pytest.mark.parametrize("corpo", [{}, {"senha": ""}, {"senha": 123}, {"senha": None}])
