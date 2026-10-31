@@ -72,6 +72,22 @@ def test_proxy_fix_inclui_prefixo_no_location():
     assert resposta.headers["Location"] == f"/api/politicas/{resposta.json['id']}"
 
 
+
+def test_proxy_fix_inclui_prefixo_no_location_do_cadastro():
+    app = create_app(
+        {"TESTING": True, "JWT_SECRET_KEY": "chave-de-teste-com-pelo-menos-32-caracteres", "PROXY_FIX": 1},
+        cliente_mongo=mongomock.MongoClient(tz_aware=True),
+    )
+
+    resposta = app.test_client().post(
+        "/usuarios",
+        json={"nome": "Ana", "email": "ana@exemplo.com", "senha": "senha-forte-123"},
+        headers={"X-Forwarded-Prefix": "/api"},
+    )
+
+    assert resposta.status_code == 201
+    assert resposta.headers["Location"] == "/api/usuarios/me"
+
 def test_provedor_combinado_permite_inicializacao():
     app = create_app(
         {

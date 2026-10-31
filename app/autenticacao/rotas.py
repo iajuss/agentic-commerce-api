@@ -5,7 +5,7 @@ Responsável: Pessoa 2 (cadastro e login) e Pessoa 3 (perfil com ViaCEP).
 
 import re
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, url_for
 from flask_jwt_extended import create_access_token
 from pymongo.errors import DuplicateKeyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -37,7 +37,7 @@ def cadastrar_usuario():
         raise ErroApi(409, "E-mail já cadastrado.", {"email": "Use outro e-mail."}) from None
 
     registrar_evento(usuario["_id"], "usuario_cadastrado", "usuario", usuario["_id"])
-    return jsonify(_usuario_publico(usuario)), 201, {"Location": "/usuarios/me"}
+    return jsonify(_usuario_publico(usuario)), 201, {"Location": url_for(".obter_perfil")}
 
 
 @bp.post("/sessoes")
