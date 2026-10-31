@@ -44,6 +44,7 @@ def sem_ganchos(app):
     """Os testes do M2 não dependem dos ganchos reais do M1 e do M3: quem precisa coloca um falso."""
     app.extensions.pop("registrar_evento", None)
     app.extensions.pop("compra_automatica", None)
+    app.extensions.pop("expirar_autorizacoes", None)
 
 
 @pytest.fixture
@@ -319,6 +320,63 @@ def test_cancelar_solicitacao_aprovada_responde_409(app, client, auth):
 
     assert resposta.status_code == 409
     assert resposta.json["erro"] == "Esta solicitação já foi aprovada e não pode ser cancelada."
+
+
+def test_ler_e_cancelar_pedem_ao_m3_para_expirar_autorizacoes_vencidas(app, client, cabecalho_de):
+    usuario_id = ObjectId()
+    headers = cabecalho_de(usuario_id)
+    criada = solicitar(client, headers, ("arroz", 1)).json
+    chamadas = []
+    app.extensions["expirar_autorizacoes"] = lambda *argumentos: chamadas.append(argumentos)
+
+    client.get("/solicitacoes", headers=headers)
+    client.get(f"/solicitacoes/{criada['id']}", headers=headers)
+    client.delete(f"/solicitacoes/{criada['id']}", headers=headers)
+
+    solicitacao_id = ObjectId(criada["id"])
+    assert chamadas == [(usuario_id, None), (usuario_id, solicitacao_id), (usuario_id, solicitacao_id)]
+
+
+def test_autorizacao_vencida_libera_o_cancelamento(app, client, auth):
+    criada = solicitar(client, auth, ("arroz", 1)).json
+    colecao = app.extensions["mongo"]["solicitacoes"]
+    colecao.update_one({"_id": ObjectId(criada["id"])}, {"$set": {"status": "aprovada"}})
+
+    def expirar(usuario_id, solicitacao_id):  # o M3 devolve a solicitação para aprovação
+        colecao.update_one({"_id": solicitacao_id, "status": "aprovada"},
+                           {"$set": {"status": "aguardando_aprovacao"}})
+
+    app.extensions["expirar_autorizacoes"] = expirar
+
+    resposta = client.delete(f"/solicitacoes/{criada['id']}", headers=auth)
+
+    assert resposta.status_code == 204
+    assert colecao.count_documents({}) == 0
+
+
+def test_solicitacao_lida_depois_da_expiracao_mostra_o_status_novo(app, client, auth):
+    criada = solicitar(client, auth, ("arroz", 1)).json
+    colecao = app.extensions["mongo"]["solicitacoes"]
+    colecao.update_one({"_id": ObjectId(criada["id"])}, {"$set": {"status": "aprovada"}})
+    app.extensions["expirar_autorizacoes"] = lambda usuario_id, solicitacao_id: colecao.update_many(
+        {"usuario_id": usuario_id, "status": "aprovada"}, {"$set": {"status": "aguardando_aprovacao"}}
+    )
+
+    assert client.get(f"/solicitacoes/{criada['id']}", headers=auth).json["status"] == "aguardando_aprovacao"
+    assert client.get("/solicitacoes", headers=auth).json[0]["status"] == "aguardando_aprovacao"
+
+
+def test_falha_ao_expirar_autorizacoes_nao_impede_a_leitura(app, client, auth):
+    criada = solicitar(client, auth, ("arroz", 1)).json
+
+    def expirar_com_falha(usuario_id, solicitacao_id):
+        raise RuntimeError("M3 fora do ar")
+
+    app.extensions["expirar_autorizacoes"] = expirar_com_falha
+
+    assert client.get("/solicitacoes", headers=auth).status_code == 200
+    assert client.get(f"/solicitacoes/{criada['id']}", headers=auth).status_code == 200
+    assert client.delete(f"/solicitacoes/{criada['id']}", headers=auth).status_code == 204
 
 
 def test_criar_registra_evento_de_auditoria(client, auth, eventos):

@@ -2,7 +2,8 @@
 
 `processar_solicitacao` não acessa o banco: recebe o catálogo, as políticas e o perfil e devolve o documento
 da solicitação (seção 4 de docs/plano-backend/00-contrato-de-integracao.md), que a rota grava. A compra
-automática é pedida ao M3 pelo gancho `compra_automatica` (seção 6.2 do contrato).
+automática é pedida ao M3 pelo gancho `compra_automatica` (seção 6.2 do contrato), e a expiração das
+autorizações vencidas, pelo gancho `expirar_autorizacoes` (seção 6.3).
 """
 
 from collections import Counter
@@ -108,6 +109,21 @@ def tentar_compra_automatica(solicitacao):
     except Exception:
         current_app.logger.exception("Falha na compra automática da solicitação %s", solicitacao["_id"])
         return True, None
+
+
+def regularizar_aprovacoes(usuario_id, solicitacao_id=None):
+    """Pede ao M3 que expire as autorizações vencidas sem pedido antes de ler ou cancelar solicitações.
+
+    A solicitação `aprovada` cuja autorização venceu volta para `aguardando_aprovacao` (seção 5 do contrato).
+    Sem o gancho nada muda; uma falha do M3 fica no log e não impede a leitura.
+    """
+    expirar = current_app.extensions.get("expirar_autorizacoes")
+    if expirar is None:
+        return
+    try:
+        expirar(usuario_id, solicitacao_id)
+    except Exception:
+        current_app.logger.exception("Falha ao expirar as autorizações vencidas do usuário %s", usuario_id)
 
 
 def _processar_item(item, ofertas, politicas, preferencias, maior_de_idade):

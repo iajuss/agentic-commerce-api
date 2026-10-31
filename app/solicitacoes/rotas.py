@@ -12,7 +12,7 @@ from app.politicas import repositorio as repositorio_politicas
 from app.solicitacoes import repositorio
 from app.solicitacoes.auditoria import auditar
 from app.solicitacoes.catalogo import fabrica_do_provedor, obter_catalogo
-from app.solicitacoes.orquestrador import processar_solicitacao, tentar_compra_automatica
+from app.solicitacoes.orquestrador import processar_solicitacao, regularizar_aprovacoes, tentar_compra_automatica
 from app.solicitacoes.validacao import validar_solicitacao
 
 bp = Blueprint("solicitacoes", __name__)
@@ -50,12 +50,18 @@ def criar_solicitacao():
 
 @bp.get("/solicitacoes")
 def listar_solicitacoes():
-    return jsonify([_resumo(solicitacao) for solicitacao in repositorio.listar(usuario_atual_id())])
+    usuario_id = usuario_atual_id()
+    regularizar_aprovacoes(usuario_id)
+    return jsonify([_resumo(solicitacao) for solicitacao in repositorio.listar(usuario_id)])
 
 
 @bp.get("/solicitacoes/<solicitacao_id>")
 def obter_solicitacao(solicitacao_id):
-    solicitacao = repositorio.obter(usuario_atual_id(), para_object_id(solicitacao_id))
+    usuario_id = usuario_atual_id()
+    solicitacao_id = para_object_id(solicitacao_id)
+
+    regularizar_aprovacoes(usuario_id, solicitacao_id)
+    solicitacao = repositorio.obter(usuario_id, solicitacao_id)
     if solicitacao is None:
         raise ErroApi(404, NAO_ENCONTRADA)
     return jsonify(documento_para_json(solicitacao))
@@ -66,6 +72,7 @@ def cancelar_solicitacao(solicitacao_id):
     usuario_id = usuario_atual_id()
     solicitacao_id = para_object_id(solicitacao_id)
 
+    regularizar_aprovacoes(usuario_id, solicitacao_id)  # a autorização vencida libera o cancelamento
     resultado = repositorio.remover_se_cancelavel(usuario_id, solicitacao_id)
     if resultado == "inexistente":
         raise ErroApi(404, NAO_ENCONTRADA)
