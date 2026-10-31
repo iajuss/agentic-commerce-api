@@ -107,18 +107,23 @@ Arquivos compartilhados:
 
 ```json
 {
-  "nome": "Eletrônicos",
-  "teto_por_compra": 500,
-  "categorias": ["smartphones", "laptops"],
+  "nome": "Mercado do mês",
+  "teto_por_compra": 300,
+  "categorias": ["mercearia", "laticínios", "casa e limpeza"],
   "lojas": [],
   "nivel_autonomia": "automatica",
   "ativa": true
 }
 ```
 
-- `categorias` e `lojas` vazias aceitam qualquer uma; a comparação ignora maiúsculas.
+- `categorias` e `lojas` vazias aceitam qualquer uma; a comparação ignora maiúsculas e acentos.
+- A categoria é comparada com o caminho da oferta (`categorias_caminho`): "bebidas" aceita uma
+  cerveja cujo caminho é "Alimentos e Bebidas > Bebidas > Bebidas Alcoólicas > Cervejas". No
+  catálogo do MVP existem, entre outras, Alimentos e Bebidas, Mercearia, Laticínios, Bebidas,
+  Bebidas Alcoólicas, Casa e Limpeza, Higiene e Cuidado Pessoal e Padaria.
+- O teto vale para a cesta inteira: itens mais frete.
 - `nivel_autonomia`: `manual` (o usuário aprova cada compra com a senha, padrão) ou
-  `automatica` (o agente compra sozinho quando a oferta cabe na política).
+  `automatica` (o agente compra sozinho quando a cesta cabe na política).
 
 O validador fica em `app/politicas/regras.py`. O orquestrador e a aprovação usam assim:
 
@@ -135,18 +140,58 @@ avaliacao.motivos            # por que as políticas recusaram (para a explicaç
 A oferta precisa de `preco`, `categoria` e `loja`; `frete` é opcional e entra no teto.
 Sem nenhuma política ativa, tudo é permitido, mas sempre com aprovação manual.
 
-## APIs externas e limites do MVP
+## O que o front precisa saber
+
+- **Senha errada na aprovação:** `POST /solicitacoes/<id>/autorizacoes` responde `401` com
+  `detalhes.senha`; a sessão continua e a tela pede a senha de novo. Um `401` sem `detalhes`
+  (token inválido, vencido ou de usuário inexistente) encerra a sessão.
+- **Autorização:** vale 15 minutos e um uso só. Se o pedido não for criado nesse prazo, ela fica
+  `expirada` e a solicitação volta de `aprovada` para `aguardando_aprovacao`: dá para aprovar de
+  novo ou cancelar. `GET /autorizacoes` lista só as ativas.
+- **Transições simuladas:** expiração do Pix, envio, entrega e devolução acontecem sozinhas e são
+  aplicadas na leitura (`GET /pedidos/<id>`, `GET /pedidos`). O comprovante só mostra o
+  `copia_e_cola` enquanto o pedido aguarda pagamento.
+- **Perfil:** `PATCH /usuarios/me` aceita qualquer subconjunto dos campos; `"endereco": null` apaga
+  o endereço. O CEP volta com máscara (`01001-000`), e o erro de CEP inexistente vem em
+  `detalhes["endereco.cep"]`. Sem `data_nascimento`, bebidas alcoólicas ficam fora das ofertas.
+- **Cancelar solicitação:** `DELETE /solicitacoes/<id>` só vale antes da aprovação e remove o
+  documento; o histórico continua na auditoria.
+- O formato completo de cada resposta está na seção 10 de
+  [docs/plano-backend/00-contrato-de-integracao.md](docs/plano-backend/00-contrato-de-integracao.md).
+
+## APIs externas
 
 O `PATCH /usuarios/me` consulta o ViaCEP para completar o endereço. O catálogo
 `combinado` reúne ofertas locais (`fixo`) e produtos da API externa DummyJSON
-no mesmo ranking. Na EC2, configure `CATALOGO_PROVEDOR=combinado`; para
-desenvolvimento local, `fixo` funciona sem acesso à API externa. O React
-chama somente esta API Flask.
+no mesmo ranking; se a DummyJSON cair, a busca segue com o `fixo`. Na EC2,
+configure `CATALOGO_PROVEDOR=combinado`; para desenvolvimento local, `fixo`
+funciona sem acesso à API externa. O React chama somente esta API Flask.
 
-O Mercado Livre não integra o catálogo do MVP; as credenciais `ML_*` ficam
-vazias. A cobrança Pix e a compra são simuladas: o sistema não movimenta
-dinheiro nem conclui compra no Mercado Livre.
-`POST /simulador-pix/pagamentos` demonstra a transição de estados do pedido.
+## Limitações do MVP
+
+- **Pagamento simulado:** não há PSP real. A cobrança Pix é um "copia e cola" falso
+  (`PIX-SIMULADO-...`), sem QR code (`qr_code_base64` é `null`), e o pagamento só é confirmado
+  por `POST /simulador-pix/pagamentos`, que existe apenas para a demonstração. Nenhum dinheiro é
+  movimentado e não há webhook.
+- **Compra e entrega simuladas:** o pedido não chega a nenhuma loja. Envio (2 minutos depois do
+  pagamento), entrega (5 minutos depois do envio), devolução e reembolso são simulados.
+- **Catálogo de demonstração:** o Mercado Livre ficou fora do MVP (as variáveis `ML_*` ficam
+  vazias; veja `docs/spike-mercadolivre.md`). O catálogo fixo tem lojas e preços fictícios, sem
+  link nem imagem. A DummyJSON tem títulos em inglês, preços fictícios, nenhuma medida no título,
+  uma única loja e frete não informado, que a cesta estima em R$ 15,00 por loja.
+- **Intenção sem LLM:** a lista de compras é interpretada por regras (vírgulas, "e", quantidades
+  em dígitos ou por extenso até dez).
+- **Governança simplificada:** a reautenticação é por senha (sem biometria nem passkey); as
+  políticas não são reavaliadas na aprovação (vale a avaliação gravada na solicitação); o
+  orçamento mensal compara só a compra atual, sem somar o gasto do mês.
+- **Sem notificações push, recompras agendadas ou alertas de preço.**
+- **Infraestrutura:** a EC2 serve HTTP sem TLS, então token e senha trafegam sem criptografia
+  (HTTPS exigiria domínio e certificado). A API cria os índices do MongoDB ao iniciar e não sobe
+  sem acesso ao Atlas. Desenvolvimento e produção usam o mesmo banco (decisão do time), então
+  dados de teste aparecem na demonstração.
+- **Serviços externos:** com o ViaCEP fora do ar, o perfil responde `502` com mensagem para o
+  usuário; com a DummyJSON fora do ar, o catálogo `combinado` mostra só as ofertas do `fixo`. Os
+  testes nunca acessam a rede.
 
 ## Coleção de requisições
 
