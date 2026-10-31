@@ -170,3 +170,28 @@ def test_fluxo_manual_ate_cancelamento_com_reembolso(app, client, catalogo_fixo,
     assert cancelado.json["status"] == "cancelado"
     assert cancelado.json["reembolso"]["status"] == "simulado"
     assert cancelado.json["reembolso"]["valor"] == pedido["total"]
+
+
+def test_autorizacao_vencida_sem_pedido_devolve_a_solicitacao_para_aprovacao(app, client, catalogo_fixo,
+                                                                             relogio):
+    cabecalho = _conta_autenticada(client)
+    _criar_politica(client, cabecalho, "manual")
+    solicitacao = _solicitar(client, cabecalho)
+    caminho = f"/solicitacoes/{solicitacao['id']}"
+
+    resposta = client.post(f"{caminho}/autorizacoes", json={"senha": CADASTRO["senha"]}, headers=cabecalho)
+    assert resposta.status_code == 201
+    autorizacao = resposta.json
+    assert client.get(caminho, headers=cabecalho).json["status"] == "aprovada"
+
+    relogio.avancar(minutes=16)  # a autorização vale 15 minutos e ninguém criou o pedido
+
+    assert client.get(caminho, headers=cabecalho).json["status"] == "aguardando_aprovacao"
+    assert client.get("/solicitacoes", headers=cabecalho).json[0]["status"] == "aguardando_aprovacao"
+    pedido = client.post("/pedidos", json={"autorizacao_id": autorizacao["id"]}, headers=cabecalho)
+    assert pedido.status_code == 409
+    eventos = client.get("/auditoria", headers=cabecalho).json["eventos"]
+    assert eventos[0]["tipo"] == "autorizacao_expirada"
+    assert eventos[0]["recurso"] == {"tipo": "autorizacao", "id": autorizacao["id"]}
+
+    assert client.delete(caminho, headers=cabecalho).status_code == 204

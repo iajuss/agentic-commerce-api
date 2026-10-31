@@ -59,6 +59,7 @@ def _rotas_da_api(app):
 def test_ganchos_dos_modulos_estao_ativos(app):
     assert callable(app.extensions["registrar_evento"])
     assert callable(app.extensions["compra_automatica"])
+    assert callable(app.extensions["expirar_autorizacoes"])
 
 
 def test_mapa_da_api_tem_exatamente_as_27_rotas_do_contrato(app):

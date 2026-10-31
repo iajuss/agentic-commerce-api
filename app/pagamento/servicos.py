@@ -45,15 +45,36 @@ def revogar_autorizacao(usuario_id, autorizacao_id):
     auditar(usuario_id, "autorizacao_revogada", "autorizacao", autorizacao_id)
 
 
+def expirar_autorizacoes_vencidas(usuario_id, solicitacao_id=None):
+    """Gancho `expirar_autorizacoes` (seção 6.3 do contrato), aplicado na leitura como as transições do pedido.
+
+    A autorização ativa que venceu sem virar pedido fica `expirada`, e a solicitação volta de `aprovada` para
+    `aguardando_aprovacao`, para a pessoa aprovar de novo ou cancelar. Cada autorização muda uma vez só (status
+    esperado no filtro), então chamadas repetidas ou simultâneas não duplicam nada. Sem `solicitacao_id`, vale
+    para todas as do usuário.
+    """
+    momento = regras.agora()
+    for vencida in repositorio_autorizacoes.listar_vencidas(usuario_id, momento, solicitacao_id):
+        expirada = repositorio_autorizacoes.expirar(usuario_id, vencida, momento)
+        if expirada is None:
+            continue  # outra requisição usou, revogou ou expirou antes
+        repositorio_contrato.mudar_status_solicitacao(usuario_id, expirada["solicitacao_id"], APROVADA,
+                                                      AGUARDANDO_APROVACAO)
+        auditar(usuario_id, "autorizacao_expirada", "autorizacao", expirada["_id"])
+
+
 def consumir_autorizacao(usuario_id, autorizacao_id):
     """Marca a autorização como usada (uso único) e a devolve.
 
-    404 se não existe ou é de outro usuário; 409 se venceu, foi revogada ou já foi usada.
+    404 se não existe ou é de outro usuário; 409 se venceu, foi revogada ou já foi usada. A que venceu fica
+    `expirada` e devolve a solicitação para aprovação.
     """
     autorizacao = repositorio_autorizacoes.consumir(usuario_id, autorizacao_id, regras.agora())
     if autorizacao is None:
-        if repositorio_autorizacoes.obter(usuario_id, autorizacao_id) is None:
+        existente = repositorio_autorizacoes.obter(usuario_id, autorizacao_id)
+        if existente is None:
             raise ErroApi(404, "Autorização não encontrada.")
+        expirar_autorizacoes_vencidas(usuario_id, existente["solicitacao_id"])
         raise ErroApi(409, "Autorização expirada, revogada ou já usada.")
     return autorizacao
 
