@@ -91,8 +91,10 @@ def validar_perfil(corpo):
 
     if "endereco" in corpo:
         endereco = corpo["endereco"]
-        if not isinstance(endereco, dict):
-            erros["endereco"] = "Informe um objeto de endereço."
+        if endereco is None:
+            campos["endereco"] = None  # null apaga o endereço
+        elif not isinstance(endereco, dict):
+            erros["endereco"] = "Informe um objeto de endereço ou null."
         else:
             validado = {}
             if "cep" in endereco:

@@ -3,6 +3,8 @@
 Responsável: Pessoa 2 (cadastro e login) e Pessoa 3 (perfil com ViaCEP).
 """
 
+import re
+
 from flask import Blueprint, jsonify
 from flask_jwt_extended import create_access_token
 from pymongo.errors import DuplicateKeyError
@@ -54,11 +56,18 @@ def criar_sessao():
     return jsonify(token=token, usuario=_usuario_publico(usuario))
 
 
+def _cep_com_mascara(cep):
+    """O banco guarda só os dígitos ("01001000"); a API devolve no formato "01001-000"."""
+    digitos = re.sub(r"\D", "", cep or "")
+    return f"{digitos[:5]}-{digitos[5:]}" if len(digitos) == 8 else cep
+
+
 def _perfil_publico(usuario):
     preferencias = usuario.get("preferencias") or {}
     endereco = usuario.get("endereco")
     if endereco is not None:
         endereco = {campo: endereco.get(campo) for campo in CAMPOS_ENDERECO}
+        endereco["cep"] = _cep_com_mascara(endereco["cep"])
     return {
         "id": str(usuario["_id"]),
         "nome": usuario["nome"],
@@ -107,7 +116,7 @@ def atualizar_perfil():
     campos = validar_perfil(ler_json())
     if not campos:
         return jsonify(_perfil_publico(usuario))
-    if "endereco" in campos:
+    if campos.get("endereco") is not None:  # endereco: null apaga o endereço sem consultar o ViaCEP
         campos["endereco"] = _endereco_atualizado(usuario.get("endereco"), campos["endereco"])
     if "preferencias" in campos:
         campos["preferencias"] = {

@@ -165,7 +165,7 @@ def _automatico(base_url, item, limite_entrega):
         )
         endereco = _dados(resposta, "endereço").get("endereco") or {}
         _conferir(
-            endereco.get("cep") == "01001000" and bool(endereco.get("cidade")),
+            endereco.get("cep") == "01001-000" and bool(endereco.get("cidade")),
             "automatico: CEP completado pelo ViaCEP",
         )
 

@@ -91,7 +91,7 @@ def test_patch_de_endereco_completa_cidade_pelo_viacep(app, client, conta, monke
     assert resposta.status_code == 200
     assert chamadas == [("https://viacep.com.br/ws/01001000/json/", 3)]
     assert resposta.json["endereco"] == {
-        "cep": "01001000",
+        "cep": "01001-000",
         "logradouro": "Praça da Sé",
         "bairro": "Sé",
         "cidade": "São Paulo",
@@ -101,6 +101,7 @@ def test_patch_de_endereco_completa_cidade_pelo_viacep(app, client, conta, monke
     }
     usuario = app.extensions["mongo"]["usuarios"].find_one({"_id": ObjectId(conta["id"])})
     assert usuario["endereco"]["cidade"] == "São Paulo"
+    assert usuario["endereco"]["cep"] == "01001000"  # o banco guarda só os dígitos
     assert "atualizado_em" in usuario
 
 
@@ -152,10 +153,71 @@ def test_cep_inexistente_responde_400_sem_atualizar(client, conta, monkeypatch, 
     )
 
     assert resposta.status_code == 400
-    assert resposta.json == {"erro": "CEP não encontrado.", "detalhes": {"cep": "Confira o CEP."}}
+    assert resposta.json == {"erro": "CEP não encontrado.", "detalhes": {"endereco.cep": "Confira o CEP."}}
     usuario = app.extensions["mongo"]["usuarios"].find_one({"_id": ObjectId(conta["id"])})
     assert "endereco" not in usuario
     assert app.extensions["mongo"]["auditoria"].count_documents({"tipo": "perfil_atualizado"}) == 0
+
+
+def test_cep_volta_com_mascara_no_get(client, conta, monkeypatch):
+    simular_viacep(monkeypatch, carregar_fixture("viacep_valido.json"))
+    client.patch("/usuarios/me", json={"endereco": {"cep": "01001000", "numero": "10"}},
+                 headers=conta["cabecalho"])
+
+    resposta = client.get("/usuarios/me", headers=conta["cabecalho"])
+
+    assert resposta.json["endereco"]["cep"] == "01001-000"
+
+
+def test_endereco_null_apaga_o_endereco_sem_chamar_o_viacep(app, client, conta, monkeypatch):
+    simular_viacep(monkeypatch, carregar_fixture("viacep_valido.json"))
+    client.patch("/usuarios/me", json={"endereco": {"cep": "01001000", "numero": "10"}},
+                 headers=conta["cabecalho"])
+    proibir_viacep(monkeypatch)
+
+    resposta = client.patch("/usuarios/me", json={"endereco": None}, headers=conta["cabecalho"])
+
+    assert resposta.status_code == 200
+    assert resposta.json["endereco"] is None
+    usuario = app.extensions["mongo"]["usuarios"].find_one({"_id": ObjectId(conta["id"])})
+    assert usuario["endereco"] is None
+    evento = app.extensions["mongo"]["auditoria"].find_one({"tipo": "perfil_atualizado"}, sort=[("_id", -1)])
+    assert evento["dados"] == {"campos": ["endereco"]}
+
+
+def test_formulario_inteiro_sem_endereco_salva_os_outros_campos(client, conta, monkeypatch):
+    proibir_viacep(monkeypatch)
+
+    resposta = client.patch(
+        "/usuarios/me",
+        json={"nome": "Ana Souza", "orcamento_mensal": 900, "endereco": None},
+        headers=conta["cabecalho"],
+    )
+
+    assert resposta.status_code == 200
+    assert resposta.json["nome"] == "Ana Souza"
+    assert resposta.json["orcamento_mensal"] == 900
+    assert resposta.json["endereco"] is None
+
+
+def test_endereco_que_nao_e_objeto_nem_null_responde_400(client, conta):
+    resposta = client.patch("/usuarios/me", json={"endereco": "Rua A, 10"}, headers=conta["cabecalho"])
+
+    assert resposta.status_code == 400
+    assert resposta.json["detalhes"] == {"endereco": "Informe um objeto de endereço ou null."}
+
+
+def test_viacep_limitando_requisicoes_responde_502_e_nao_cep_inexistente(client, conta, monkeypatch):
+    simular_viacep(monkeypatch, {}, status=429)
+
+    resposta = client.patch(
+        "/usuarios/me",
+        json={"endereco": {"cep": "01001000", "numero": "1"}},
+        headers=conta["cabecalho"],
+    )
+
+    assert resposta.status_code == 502
+    assert resposta.json == {"erro": "Serviço de CEP indisponível no momento. Tente novamente em instantes."}
 
 
 def test_cep_malformado_e_rejeitado_sem_chamar_viacep(client, conta, monkeypatch):
