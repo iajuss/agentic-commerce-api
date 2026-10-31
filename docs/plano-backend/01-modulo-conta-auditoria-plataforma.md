@@ -186,10 +186,10 @@ Branch `feat/m1-deploy-ec2` · Sexta (sobe o que já estiver no `main`; no sába
 - `systemctl enable --now agentic-commerce-api` e ativar o site do nginx.
 
 **Aceite:**
-- [ ] De fora da AWS, `curl -i http://<ip>/api/health` → `200` com `"banco": "ok"`.
-- [ ] `POST /api/politicas` devolve `Location` com `/api`.
-- [ ] Depois de reiniciar a instância, a API volta sozinha.
-- [ ] O README tem o link de produção e o passo a passo, sem nenhum segredo.
+- [x] De fora da AWS, `curl -i http://<ip>/api/health` → `200` com `"banco": "ok"`.
+- [x] `POST /api/politicas` devolve `Location` com `/api`.
+- [x] Depois de reiniciar a instância, a API volta sozinha.
+- [x] O README tem o link de produção e o passo a passo, sem nenhum segredo.
 
 ## M1-08 — Integração e entrega
 Sábado e domingo · Lidera o roteiro de [04-integracao-e-entrega.md](04-integracao-e-entrega.md): teste global de
