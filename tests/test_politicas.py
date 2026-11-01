@@ -4,9 +4,9 @@ import pytest
 from bson import ObjectId
 
 POLITICA = {
-    "nome": "Eletrônicos do dia a dia",
+    "nome": "Rotina do mercado",
     "teto_por_compra": 500,
-    "categorias": ["Smartphones", " laptops "],
+    "categorias": ["Mercearia", " limpeza "],
     "lojas": [],
     "nivel_autonomia": "automatica",
 }
@@ -21,7 +21,7 @@ def test_criar_responde_201_com_location(client, auth):
 
     assert resposta.status_code == 201
     assert resposta.headers["Location"] == f"/politicas/{resposta.json['id']}"
-    assert resposta.json["categorias"] == ["smartphones", "laptops"]
+    assert resposta.json["categorias"] == ["mercearia", "limpeza"]
     assert resposta.json["teto_por_compra"] == 500.0
     assert resposta.json["ativa"] is True
 
@@ -42,7 +42,7 @@ def test_criar_usa_autonomia_manual_por_padrao(client, auth):
         ("teto_por_compra", 0),
         ("teto_por_compra", "100"),
         ("teto_por_compra", True),
-        ("categorias", "smartphones"),
+        ("categorias", "mercearia"),
         ("lojas", [1, 2]),
         ("nivel_autonomia", "total"),
         ("ativa", "sim"),
@@ -103,12 +103,12 @@ def test_id_malformado_ou_inexistente_responde_404(client, auth, politica_id):
 
 def test_substituir_politica(client, auth):
     politica_id = criar(client, auth).json["id"]
-    nova = {"nome": "Só livros", "teto_por_compra": 80, "categorias": ["books"]}
+    nova = {"nome": "Só bebidas", "teto_por_compra": 80, "categorias": ["bebidas"]}
 
     resposta = client.put(f"/politicas/{politica_id}", json=nova, headers=auth)
 
     assert resposta.status_code == 200
-    assert resposta.json["categorias"] == ["books"]
+    assert resposta.json["categorias"] == ["bebidas"]
     assert resposta.json["nivel_autonomia"] == "manual"
 
 

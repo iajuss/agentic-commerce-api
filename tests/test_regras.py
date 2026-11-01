@@ -4,7 +4,7 @@ from bson import ObjectId
 
 from app.politicas.regras import AUTOMATICA, MANUAL, avaliar_oferta
 
-OFERTA = {"preco": 300.0, "frete": 20.0, "categoria": "Smartphones", "loja": "Apple"}
+OFERTA = {"preco": 300.0, "frete": 20.0, "categoria": "Mercearia", "loja": "Mercado Exemplo"}
 
 
 def politica(**campos):
@@ -41,30 +41,30 @@ def test_teto_considera_o_frete():
 
 
 def test_categoria_e_loja_ignoram_maiusculas():
-    regra = politica(categorias=["smartphones"], lojas=["apple"])
+    regra = politica(categorias=["mercearia"], lojas=["mercado exemplo"])
 
     assert avaliar_oferta(OFERTA, [regra]).permitida
 
 
 def test_categoria_fora_da_lista_e_recusada():
-    avaliacao = avaliar_oferta(OFERTA, [politica(categorias=["books"])])
+    avaliacao = avaliar_oferta(OFERTA, [politica(categorias=["bebidas"])])
 
     assert not avaliacao.permitida
-    assert "categoria 'Smartphones' não permitida" in avaliacao.motivos[0]
+    assert "categoria 'Mercearia' não permitida" in avaliacao.motivos[0]
 
 
 def test_loja_fora_da_lista_e_recusada():
-    assert not avaliar_oferta(OFERTA, [politica(lojas=["samsung"])]).permitida
+    assert not avaliar_oferta(OFERTA, [politica(lojas=["atacado bom preço"])]).permitida
 
 
 def test_basta_uma_politica_aceitar():
-    livros = politica(categorias=["books"])
-    celulares = politica(categorias=["smartphones"])
+    bebidas = politica(categorias=["bebidas"])
+    mercearia = politica(categorias=["mercearia"])
 
-    avaliacao = avaliar_oferta(OFERTA, [livros, celulares])
+    avaliacao = avaliar_oferta(OFERTA, [bebidas, mercearia])
 
     assert avaliacao.permitida
-    assert avaliacao.politica_id == celulares["_id"]
+    assert avaliacao.politica_id == mercearia["_id"]
 
 
 def test_compra_automatica_quando_politica_automatica_aceita():
