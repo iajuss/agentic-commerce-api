@@ -8,10 +8,9 @@ A API Flask recebe o cliente React do repositório separado `agentic-commerce-we
 guarda os dados no MongoDB Atlas e protege as rotas com JWT. Endereço por CEP, catálogo,
 autorização, Pix simulado, pós-compra e auditoria participam do mesmo fluxo.
 
-**Produção:** a API está no ar em <http://54.209.228.101/api>; a saúde fica em
-<http://54.209.228.101/api/health>. O frontend ainda não foi publicado, então a raiz do
-endereço mostra uma página provisória. Para desenvolver, execute a API localmente com
-as instruções abaixo.
+**Produção:** a aplicação está no ar em <http://54.209.228.101>. O frontend fica na raiz e
+a API em <http://54.209.228.101/api>, com a saúde em <http://54.209.228.101/api/health>.
+Para desenvolver, execute a API localmente com as instruções abaixo.
 
 ## Como rodar
 
@@ -235,8 +234,9 @@ configurado. O script sai com código diferente de zero se algum passo falhar.
 A produção roda em `http://54.209.228.101`, numa t3.micro com Ubuntu 22.04 LTS,
 Gunicorn e nginx: o nginx serve o build do React em `/` e encaminha `/api/` para
 o Gunicorn em `127.0.0.1:8000`. Os arquivos em `deploy/` pressupõem o clone em
-`/opt/agentic-commerce-api` e o build do React em `/var/www/agentic-commerce-web`.
-A equipe do frontend publica o build nesse segundo caminho.
+`/opt/agentic-commerce-api` e as versões do front em `/var/www/agentic-commerce-web`,
+onde o nginx serve o link `atual`. O build do React é publicado com
+`deploy/publicar-front.sh` (veja [Publicar o front](#publicar-o-front)).
 
 1. Use uma instância t2.micro ou t3.micro com Ubuntu 22.04 ou 24.04 LTS.
    Restrinja SSH (porta 22) ao IP de administração e abra HTTP (porta 80).
@@ -296,14 +296,14 @@ A equipe do frontend publica o build nesse segundo caminho.
    sudo systemctl enable --now agentic-commerce-api
    ```
 
-5. Instale e ative o site nginx. Enquanto o front não publica o build,
-   deixe um `index.html` provisório; sem ele, a raiz responde `500`:
+5. Instale e ative o site nginx, com os cabeçalhos de segurança. Até a
+   primeira publicação do front, a raiz responde `404`; a API já funciona em
+   `/api/`:
 
    ```bash
    sudo mkdir -p /var/www/agentic-commerce-web
    sudo chown ubuntu:ubuntu /var/www/agentic-commerce-web
-   echo '<p>API no ar em <a href="/api/health">/api/health</a>.</p>' \
-       > /var/www/agentic-commerce-web/index.html
+   sudo cp deploy/nginx-agentic-commerce-cabecalhos.conf /etc/nginx/snippets/agentic-commerce-cabecalhos.conf
    sudo cp deploy/nginx-agentic-commerce.conf /etc/nginx/sites-available/agentic-commerce
    sudo ln -s /etc/nginx/sites-available/agentic-commerce /etc/nginx/sites-enabled/agentic-commerce
    if [ -L /etc/nginx/sites-enabled/default ]; then
@@ -327,12 +327,35 @@ Consulte os logs com
 
 ### Publicar o front
 
-Gere o build do `agentic-commerce-web` com `VITE_API_URL=/api`: o React chama
-a API no mesmo endereço, sem CORS. Depois copie o conteúdo de `dist/` para a
-EC2; o nginx serve os arquivos novos sem reiniciar.
+O `.env.production` do `agentic-commerce-web` aponta a API para `/api`: o React
+chama a API no mesmo endereço, sem CORS. Gere o build na `main` atualizada,
+empacote o conteúdo de `dist/` e publique-o com `deploy/publicar-front.sh`.
+Rode no Git Bash (ou no Linux), na pasta do front:
 
 ```bash
-pnpm install
-VITE_API_URL=/api pnpm build    # PowerShell: $env:VITE_API_URL="/api"; pnpm build
-scp -i CHAVE.pem -r dist/* ubuntu@IP_PUBLICO_DA_EC2:/var/www/agentic-commerce-web/
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm lint && pnpm build
+tar -C dist -czf /tmp/front.tar.gz .
+scp -i CHAVE.pem /tmp/front.tar.gz ubuntu@IP_PUBLICO_DA_EC2:/tmp/front.tar.gz
+ssh -i CHAVE.pem ubuntu@IP_PUBLICO_DA_EC2 \
+    "bash /opt/agentic-commerce-api/deploy/publicar-front.sh /tmp/front.tar.gz $(git rev-parse --short HEAD) && rm /tmp/front.tar.gz"
 ```
+
+- **Versões e troca atômica:** cada build vira uma pasta em
+  `/var/www/agentic-commerce-web/versoes/` com a data e o commit do front. O
+  link `atual` só muda depois de o script conferir o pacote, e muda de uma
+  vez, sem reiniciar o nginx.
+- **Conferência e retorno:** se o nginx não servir a versão nova, o link volta
+  sozinho para a anterior. Para desfazer uma publicação, rode
+  `bash /opt/agentic-commerce-api/deploy/publicar-front.sh --voltar` na
+  instância. As 5 versões mais recentes ficam guardadas.
+- **Variável de ambiente:** não rode `VITE_API_URL=/api pnpm build` no Git
+  Bash. O MSYS converte `/api` em `C:/Program Files/Git/api`, e o site sobe
+  sem conseguir chamar a API. Uma `VITE_API_URL` definida no ambiente também
+  vence o `.env.production`.
+- **Cache:** o nginx guarda por um ano os arquivos de `/assets/`, que têm o
+  hash no nome, e manda o navegador conferir o `index.html` a cada visita.
+  Uma publicação nova aparece no próximo carregamento da página.
+- **HTTPS:** a EC2 serve só HTTP, então o navegador não libera a área de
+  transferência, e o botão de copiar o Pix pede para copiar manualmente.
