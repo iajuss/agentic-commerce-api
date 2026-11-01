@@ -21,6 +21,8 @@ PAUSA_APOS_FALHA_SEGUNDOS = 60
 INDISPONIVEL = "Catálogo indisponível no momento. Tente novamente em instantes."
 LOJA_PADRAO = "DummyJSON"
 CATEGORIA = "Mercearia"
+# Mesmo caminho do catálogo fixo: uma política com "Alimentos e Bebidas" também aceita as ofertas da DummyJSON.
+CATEGORIAS_CAMINHO = ("Alimentos e Bebidas", CATEGORIA)
 
 # Radical em português (sem acento) -> palavras em inglês que precisam aparecer no título. "papel" fica de fora:
 # "papel higiênico" casaria com a caixa de lenço ("Tissue Paper Box"), que é o que "lenço" encontra.
@@ -139,7 +141,7 @@ def _normalizar(produto):
         avaliacao=produto.get("rating"),
         estoque=produto.get("stock"),
         categoria=CATEGORIA,
-        categorias_caminho=[CATEGORIA],
+        categorias_caminho=list(CATEGORIAS_CAMINHO),
         loja=marca or LOJA_PADRAO,
         imagem=produto.get("thumbnail"),
     )
