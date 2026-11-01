@@ -9,9 +9,9 @@ guarda os dados no MongoDB Atlas e protege as rotas com JWT. Endereço por CEP, 
 autorização, Pix simulado, pós-compra e auditoria participam do mesmo fluxo.
 
 **Produção:** a API está no ar em <http://54.209.228.101/api>; a saúde fica em
-<http://54.209.228.101/api/health>. O frontend ainda não foi publicado, então a raiz do
-endereço mostra uma página provisória. Para desenvolver, execute a API localmente com
-as instruções abaixo.
+<http://54.209.228.101/api/health>. A raiz, <http://54.209.228.101/>, serve o build do
+frontend ([`agentic-commerce-web`](https://github.com/iajuss/agentic-commerce-web)) pelo
+mesmo nginx. Para desenvolver, execute a API localmente com as instruções abaixo.
 
 ## Como rodar
 
