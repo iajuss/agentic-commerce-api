@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pytest
 import requests
+from bson import ObjectId
 
 from app.erros import ErroApi
+from app.politicas.regras import MANUAL, avaliar_oferta
 from app.solicitacoes.catalogo import obter_catalogo
 from app.solicitacoes.catalogo import dummyjson
 from app.solicitacoes.catalogo.base import validar_oferta
@@ -76,7 +78,22 @@ def test_normaliza_preco_prazo_e_frete(chamadas):
     assert arroz["prazo_dias"] == 1
     assert arroz["frete"] is None
     assert arroz["frete_gratis"] is False
-    assert arroz["categorias_caminho"] == ["Mercearia"]
+    assert arroz["categorias_caminho"] == ["Alimentos e Bebidas", "Mercearia"]
+
+
+def test_politica_de_alimentos_aceita_as_ofertas_da_dummyjson(chamadas):
+    arroz = CatalogoDummyJson().buscar("arroz")[0]
+    mercado = {
+        "_id": ObjectId(),
+        "nome": "Mercado do mês",
+        "teto_por_compra": 300.0,
+        "categorias": ["Alimentos e Bebidas", "Casa e Limpeza"],
+        "lojas": [],
+        "nivel_autonomia": MANUAL,
+        "ativa": True,
+    }
+
+    assert avaliar_oferta(arroz, [mercado]).permitida
 
 
 @pytest.mark.parametrize("informacao, dias", [

@@ -114,7 +114,8 @@ Branch `feat/m2-catalogo-externo` · Quarta à tarde e quinta · Rubrica: API ex
 - `GET https://dummyjson.com/products/category/groceries` (27 produtos com `title`, `price`, `rating`, `stock`).
 - Os títulos estão em inglês: use um dicionário PT→EN dos itens comuns (arroz→rice, leite→milk, ovos→eggs,
   café→coffee, água→water, suco→juice etc.).
-- `fonte: "dummyjson"` e `categorias_caminho: ["Mercearia"]`.
+- `fonte: "dummyjson"` e `categorias_caminho: ["Alimentos e Bebidas", "Mercearia"]`, o mesmo caminho do catálogo
+  fixo, para que uma política com "Alimentos e Bebidas" aceite as ofertas externas.
 - Escolhida no M2-01 (30/10). `catalogo/combinado.py` (`CATALOGO_PROVEDOR=combinado`) junta a DummyJSON ao catálogo
   fixo no mesmo ranking; se ela cair, a busca segue com o fixo.
 
