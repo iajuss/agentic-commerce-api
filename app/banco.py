@@ -29,6 +29,8 @@ def criar_indices(db):
     db["pedidos"].create_index("autorizacao_id", unique=True)
     db["chamados"].create_index([("pedido_id", ASCENDING), ("criado_em", ASCENDING)])
     db["auditoria"].create_index([("usuario_id", ASCENDING), ("criado_em", DESCENDING)])
+    # GET /auditoria pagina por _id e aceita filtro por tipo; este índice cobre as duas consultas.
+    db["auditoria"].create_index([("usuario_id", ASCENDING), ("tipo", ASCENDING), ("_id", DESCENDING)])
 
 
 def banco():

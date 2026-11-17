@@ -11,9 +11,11 @@ def inserir(evento):
     return evento
 
 
-def listar(usuario_id, limite, antes_de=None):
-    """Lista eventos do usuário em ordem de criação decrescente."""
+def listar(usuario_id, limite, antes_de=None, tipo=None):
+    """Lista eventos do usuário em ordem de criação decrescente, opcionalmente só de um tipo."""
     filtro = {"usuario_id": usuario_id}
     if antes_de is not None:
         filtro["_id"] = {"$lt": antes_de}
+    if tipo is not None:
+        filtro["tipo"] = tipo
     return list(banco()["auditoria"].find(filtro).sort("_id", DESCENDING).limit(limite))
