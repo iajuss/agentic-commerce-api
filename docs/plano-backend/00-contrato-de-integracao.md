@@ -53,7 +53,7 @@ sábado. Rotas marcadas como públicas não exigem token; todas as outras també
 | M1 | `GET /politicas/<politica_id>` | | Obtém política (pronta) | 200 | 404 |
 | M1 | `PUT /politicas/<politica_id>` | | Substitui política (pronta) | 200 | 400, 404 |
 | M1 | `DELETE /politicas/<politica_id>` | | Remove política (pronta) | 204 | 404 |
-| M1 | `GET /auditoria` | | Trilha de eventos do usuário, paginada | 200 | 400 |
+| M1 | `GET /auditoria` | | Trilha de eventos do usuário, paginada e filtrável por tipo | 200 | 400 |
 | M2 | `POST /solicitacoes` | | Lista de compras → catálogo → políticas → ranking → cesta | 201 | 400, 502 |
 | M2 | `GET /solicitacoes` | | Histórico (resumo) | 200 | — |
 | M2 | `GET /solicitacoes/<solicitacao_id>` | | Solicitação completa, com a explicação | 200 | 404 |
@@ -338,8 +338,10 @@ descrições e `total` é o `cesta.total`. O documento completo vem em `GET /sol
 `GET /pedidos/<id>` tem o mesmo formato, com o status atual (`pago`, `enviado`, `entregue`, `expirado`, `cancelado`,
 `devolucao_solicitada` ou `devolvido`) e, quando houver, `reembolso: {"valor", "status": "simulado", "em"}`.
 
-`GET /auditoria?limite=50&antes_de=<id>`:
+`GET /auditoria?limite=50&antes_de=<id>&tipo=<tipo>`:
 `{"eventos": [{"id", "tipo", "recurso": {"tipo", "id"}, "dados", "criado_em"}], "proximo": "<id> ou null"}`.
+O `tipo` é opcional e filtra a trilha por um dos tipos da seção 7 (`solicitacao_criada`, `pedido_criado`, ...);
+um tipo fora do formato snake_case responde `400` com `detalhes.tipo`.
 
 `GET /usuarios/me`: `{"id", "nome", "email", "data_nascimento", "endereco", "preferencias", "orcamento_mensal",
 "criado_em"}`, com `null` (ou listas vazias em `preferencias`) nos campos ainda não preenchidos. O `endereco.cep` volta

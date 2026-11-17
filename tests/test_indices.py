@@ -15,6 +15,7 @@ INDICES_ESPERADOS = [
     ("pedidos", [("autorizacao_id", ASCENDING)], True),
     ("chamados", [("pedido_id", ASCENDING), ("criado_em", ASCENDING)], False),
     ("auditoria", [("usuario_id", ASCENDING), ("criado_em", DESCENDING)], False),
+    ("auditoria", [("usuario_id", ASCENDING), ("tipo", ASCENDING), ("_id", DESCENDING)], False),
 ]
 
 

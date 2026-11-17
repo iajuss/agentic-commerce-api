@@ -99,6 +99,51 @@ def test_paginacao_usa_o_ultimo_id_da_pagina(app, client, cabecalho_de):
     assert segunda.json["proximo"] is None
 
 
+def test_filtro_por_tipo_devolve_apenas_os_eventos_daquele_tipo(app, client, cabecalho_de):
+    usuario_id = ObjectId()
+    with app.app_context():
+        registrar_evento(usuario_id, "sessao_iniciada")
+        primeira = registrar_evento(usuario_id, "politica_criada")["_id"]
+        registrar_evento(usuario_id, "login_recusado")
+        segunda = registrar_evento(usuario_id, "politica_criada")["_id"]
+
+    resposta = client.get("/auditoria?tipo=politica_criada", headers=cabecalho_de(usuario_id))
+
+    assert resposta.status_code == 200
+    assert [evento["id"] for evento in resposta.json["eventos"]] == [str(segunda), str(primeira)]
+    assert resposta.json["proximo"] is None
+
+
+def test_filtro_por_tipo_pagina_e_isola_por_usuario(app, client, cabecalho_de):
+    usuario_id = ObjectId()
+    with app.app_context():
+        ids = [registrar_evento(usuario_id, "politica_criada")["_id"] for _ in range(2)]
+        registrar_evento(ObjectId(), "politica_criada")
+    cabecalho = cabecalho_de(usuario_id)
+
+    primeira = client.get("/auditoria?tipo=politica_criada&limite=1", headers=cabecalho)
+    segunda = client.get(
+        f"/auditoria?tipo=politica_criada&limite=1&antes_de={primeira.json['proximo']}",
+        headers=cabecalho,
+    )
+
+    assert [evento["id"] for evento in primeira.json["eventos"]] == [str(ids[1])]
+    assert primeira.json["proximo"] == str(ids[1])
+    assert [evento["id"] for evento in segunda.json["eventos"]] == [str(ids[0])]
+    assert segunda.json["proximo"] is None
+
+
+def test_filtro_por_tipo_sem_eventos_devolve_lista_vazia(app, client, cabecalho_de):
+    usuario_id = ObjectId()
+    with app.app_context():
+        registrar_evento(usuario_id, "sessao_iniciada")
+
+    resposta = client.get("/auditoria?tipo=pedido_criado", headers=cabecalho_de(usuario_id))
+
+    assert resposta.status_code == 200
+    assert resposta.json == {"eventos": [], "proximo": None}
+
+
 @pytest.mark.parametrize(
     ("consulta", "campo"),
     [
@@ -107,6 +152,11 @@ def test_paginacao_usa_o_ultimo_id_da_pagina(app, client, cabecalho_de):
         ("limite=abc", "limite"),
         ("antes_de=invalido", "antes_de"),
         ("antes_de=", "antes_de"),
+        ("tipo=", "tipo"),
+        ("tipo=Politica_Criada", "tipo"),
+        ("tipo=politica-criada", "tipo"),
+        ("tipo=politica criada", "tipo"),
+        ("tipo=_politica", "tipo"),
     ],
 )
 def test_parametros_invalidos_respondem_400(client, cabecalho_de, consulta, campo):

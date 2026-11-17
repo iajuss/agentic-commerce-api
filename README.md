@@ -14,7 +14,7 @@ com cada passo registrado numa trilha de auditoria.
 ![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=flat-square&logo=flask&logoColor=white)
 ![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![JWT](https://img.shields.io/badge/auth-JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
-![pytest](https://img.shields.io/badge/pytest-589_testes-0A9EDC?style=flat-square&logo=pytest&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-598_testes-0A9EDC?style=flat-square&logo=pytest&logoColor=white)
 ![AWS EC2](https://img.shields.io/badge/AWS_EC2-Ubuntu_22.04-FF9900?style=flat-square&logo=ubuntu&logoColor=white)
 ![nginx e gunicorn](https://img.shields.io/badge/servidor-nginx_%2B_gunicorn-009639?style=flat-square&logo=nginx&logoColor=white)
 
@@ -157,7 +157,7 @@ ganchos em `app.extensions` (`registrar_evento`, `compra_automatica` e `expirar_
 |---|---|---|
 | **C+** | Rotas com dados no Atlas, catálogo externo no ranking e cada rota usada por uma tela do React | 27 rotas, todas chamadas pelo [front](https://github.com/iajuss/agentic-commerce-web#-telas-e-rotas-da-api); ofertas da DummyJSON no ranking |
 | **B** | API na EC2, com o link no README da API | <http://54.209.228.101/api/health> |
-| **B+** | pytest cobrindo todas as rotas, com catálogo e pagamento mockados | 589 testes, sem rede e sem Atlas ([Testes](#-testes)) |
+| **B+** | pytest cobrindo todas as rotas, com catálogo e pagamento mockados | 598 testes, sem rede e sem Atlas ([Testes](#-testes)) |
 | **A** | Cadastro, login e rotas protegidas por JWT | `proteger_rotas` em `app/__init__.py`; login, logout e rotas privadas no React |
 | **A+** | Build do React servido pelo nginx na EC2, com o link no README do front | <http://54.209.228.101> |
 
@@ -257,7 +257,7 @@ demais exigem `Authorization: Bearer <token>`.
 | Pós-compra | `POST` | `/pedidos/{id}/chamados` | Abre um chamado de pós-venda | `201` |
 | Pós-compra | `GET` | `/pedidos/{id}/chamados` | Lista os chamados do pedido | `200` |
 | Pós-compra | `GET` | `/pedidos/{id}/chamados/{chamado_id}` | Obtém um chamado | `200` |
-| Auditoria | `GET` | `/auditoria?limite=50&antes_de={id}` | Trilha de eventos, paginada (1 a 100 por página) | `200` |
+| Auditoria | `GET` | `/auditoria?limite=50&antes_de={id}&tipo={tipo}` | Trilha de eventos, paginada (1 a 100 por página) e com filtro opcional por tipo | `200` |
 
 Os erros possíveis de cada rota e o formato completo de cada resposta estão nas seções 2 e 10 do
 [contrato de integração](docs/plano-backend/00-contrato-de-integracao.md).
@@ -425,7 +425,7 @@ acesso à rede. O React chama somente esta API Flask.
 ## 🧪 Testes
 
 ```bash
-pytest                          # suíte completa: 589 testes
+pytest                          # suíte completa: 598 testes
 pytest tests/test_ranking.py    # um arquivo
 pytest -k devolucao             # filtra pelo nome
 ```
@@ -653,7 +653,7 @@ agentic-commerce-api/
 ├── deploy/                   # systemd, gunicorn, nginx e scripts de atualização e publicação
 ├── docs/                     # contrato, plano do MVP, spike do Mercado Livre e coleções Postman
 ├── scripts/                  # testar_atlas, ensaio_ponta_a_ponta e autorizar_mercadolivre
-├── tests/                    # 589 testes (pytest + mongomock) e respostas mockadas em fixtures/
+├── tests/                    # 598 testes (pytest + mongomock) e respostas mockadas em fixtures/
 ├── .env.example              # nomes e padrões das variáveis, sem credenciais
 ├── requirements.txt
 └── wsgi.py                   # ponto de entrada: flask --app wsgi run / gunicorn wsgi:app
