@@ -192,7 +192,10 @@ def auditar(usuario_id, tipo, recurso_tipo=None, recurso_id=None, dados=None):
 ```
 
 Regras: chame só **depois** de a ação dar certo; `usuario_id` é `ObjectId`; `dados` é um dicionário pequeno e
-**nunca** contém senha, hash, token nem `copia_e_cola`.
+**nunca** contém senha, hash, token nem `copia_e_cola`. O `registrar_evento` ainda descarta, em qualquer
+profundidade, todo campo cujo nome contenha um fragmento sensível (`senha`, `token`, `secret`, `segredo`,
+`credencial`, `authorization`, `copia_e_cola`, `qr_code`, `cartao`, `cvv`, `cpf`), mas o gancho não é desculpa
+para mandar o campo.
 
 ### 6.2 `compra_automatica` (fornecido pelo M3, consumido pelo M2)
 

@@ -4,11 +4,33 @@ from datetime import datetime, timezone
 
 from app.auditoria import repositorio
 
-CHAVES_SENSIVEIS = frozenset({"senha", "senha_hash", "token", "copia_e_cola"})
+# Pedaços de nome de campo que nunca entram na trilha. A comparação é por substring e sem
+# diferenciar maiúsculas, então "senha_nova", "access_token" e "COPIA_E_COLA" também ficam de fora.
+FRAGMENTOS_SENSIVEIS = (
+    "senha",
+    "token",
+    "secret",
+    "segredo",
+    "credencial",
+    "authorization",
+    "copia_e_cola",
+    "qr_code",
+    "cartao",
+    "cvv",
+    "cpf",
+)
 
 
 def agora():
     return datetime.now(timezone.utc)
+
+
+def chave_sensivel(chave):
+    """Diz se o nome do campo tem algum fragmento que não pode ir para a trilha."""
+    if not isinstance(chave, str):
+        return False
+    normalizada = chave.strip().lower()
+    return any(fragmento in normalizada for fragmento in FRAGMENTOS_SENSIVEIS)
 
 
 def _sem_dados_sensiveis(valor):
@@ -16,7 +38,7 @@ def _sem_dados_sensiveis(valor):
         return {
             chave: _sem_dados_sensiveis(item)
             for chave, item in valor.items()
-            if chave not in CHAVES_SENSIVEIS
+            if not chave_sensivel(chave)
         }
     if isinstance(valor, list):
         return [_sem_dados_sensiveis(item) for item in valor]
