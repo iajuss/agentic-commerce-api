@@ -55,6 +55,52 @@ def test_registro_remove_chaves_sensiveis_inclusive_em_dados_aninhados(app):
     }
     assert app.extensions["mongo"]["auditoria"].count_documents({}) == 1
 
+@pytest.mark.parametrize(
+    "chave",
+    [
+        "senha",
+        "senha_nova",
+        "SENHA",
+        "token",
+        "access_token",
+        "refresh_token",
+        "secret_key",
+        "segredo_do_pix",
+        "credencial",
+        "authorization",
+        "copia_e_cola",
+        "qr_code_base64",
+        "cartao_credito",
+        "cvv",
+        "cpf",
+        "  Senha  ",
+    ],
+)
+def test_registro_remove_campo_sensivel_pelo_nome(app, chave):
+    with app.app_context():
+        evento = registrar_evento(ObjectId(), "evento_teste", dados={chave: "segredo", "origem": "teste"})
+
+    assert evento["dados"] == {"origem": "teste"}
+
+
+@pytest.mark.parametrize("chave", ["origem", "total", "status", "itens", "campos", "descartados", "txid"])
+def test_registro_mantem_os_campos_dos_eventos_do_contrato(app, chave):
+    with app.app_context():
+        evento = registrar_evento(ObjectId(), "evento_teste", dados={chave: 1})
+
+    assert evento["dados"] == {chave: 1}
+
+
+def test_registro_remove_campo_sensivel_em_qualquer_profundidade(app):
+    dados = {
+        "pix": {"COPIA_E_COLA": "PIX-SIMULADO", "qr_code_base64": "iVBOR", "txid": "9f1c"},
+        "tentativas": [{"Senha": "segredo", "em": "agora"}],
+    }
+    with app.app_context():
+        evento = registrar_evento(ObjectId(), "evento_teste", dados=dados)
+
+    assert evento["dados"] == {"pix": {"txid": "9f1c"}, "tentativas": [{"em": "agora"}]}
+
 
 def test_listagem_devolve_eventos_recentes_sem_expor_usuario_id(app, client, cabecalho_de):
     usuario_id = ObjectId()

@@ -66,8 +66,11 @@ Branch `feat/m1-auditoria` · Quarta–quinta
 - `app/auditoria/repositorio.py`: só `inserir(evento)` e `listar(usuario_id, limite, antes_de)`, ordenado por `_id`
   decrescente (ordem de criação). Nenhuma função de alterar ou apagar.
 - `app/auditoria/registro.py`: `registrar_evento(usuario_id, tipo, recurso_tipo=None, recurso_id=None, dados=None)`
-  grava `{usuario_id, tipo, recurso: {tipo, id}, dados, criado_em}`. Remove de `dados` as chaves `senha`,
-  `senha_hash`, `token` e `copia_e_cola` (constante `CHAVES_SENSIVEIS`).
+  grava `{usuario_id, tipo, recurso: {tipo, id}, dados, criado_em}`. Remove de `dados`, em qualquer
+  profundidade, todo campo cujo nome contenha um fragmento sensível (`senha`, `token`, `secret`, `segredo`,
+  `credencial`, `authorization`, `copia_e_cola`, `qr_code`, `cartao`, `cvv` ou `cpf`, constante
+  `FRAGMENTOS_SENSIVEIS`): a comparação é por substring e sem diferenciar maiúsculas, então `senha_hash`,
+  `access_token` e `COPIA_E_COLA` também ficam de fora.
 - `app/auditoria/rotas.py`:
   - registra o gancho com
     `bp.record_once(lambda estado: estado.app.extensions.setdefault("registrar_evento", registrar_evento))`;
