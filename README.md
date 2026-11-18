@@ -119,7 +119,7 @@ flowchart LR
     U["👤 Navegador"] -->|"HTTP :80"| N["nginx<br>EC2 t3.micro · Ubuntu 22.04"]
     N -->|"/"| W["Build do React<br>agentic-commerce-web"]
     N -->|"/api/"| G["gunicorn<br>127.0.0.1:8000"]
-    G --> F["Flask<br>7 blueprints · 27 rotas · JWT"]
+    G --> F["Flask<br>7 blueprints · 28 rotas · JWT"]
     F --> M[("MongoDB Atlas<br>7 coleções")]
     F --> V["ViaCEP<br>endereço pelo CEP"]
     F --> D["DummyJSON<br>catálogo externo"]
@@ -155,7 +155,7 @@ ganchos em `app.extensions` (`registrar_evento`, `compra_automatica` e `expirar_
 
 | Conceito | Critério | Onde conferir |
 |---|---|---|
-| **C+** | Rotas com dados no Atlas, catálogo externo no ranking e cada rota usada por uma tela do React | 27 rotas, todas chamadas pelo [front](https://github.com/iajuss/agentic-commerce-web#-telas-e-rotas-da-api); ofertas da DummyJSON no ranking |
+| **C+** | Rotas com dados no Atlas, catálogo externo no ranking e cada rota usada por uma tela do React | 28 rotas, todas chamadas pelo [front](https://github.com/iajuss/agentic-commerce-web#-telas-e-rotas-da-api); ofertas da DummyJSON no ranking |
 | **B** | API na EC2, com o link no README da API | <http://54.209.228.101/api/health> |
 | **B+** | pytest cobrindo todas as rotas, com catálogo e pagamento mockados | 622 testes, sem rede e sem Atlas ([Testes](#-testes)) |
 | **A** | Cadastro, login e rotas protegidas por JWT | `proteger_rotas` em `app/__init__.py`; login, logout e rotas privadas no React |
@@ -245,6 +245,7 @@ demais exigem `Authorization: Bearer <token>`.
 | Solicitações | `GET` | `/solicitacoes` | Histórico (resumo) | `200` |
 | Solicitações | `GET` | `/solicitacoes/{id}` | Solicitação completa, com a explicação | `200` |
 | Solicitações | `DELETE` | `/solicitacoes/{id}` | Cancela antes da aprovação | `204` |
+| Solicitações | `PATCH` | `/solicitacoes/{id}/itens/{indice}` | Troca a oferta do item por uma das alternativas | `200` |
 | Pagamento | `POST` | `/solicitacoes/{id}/autorizacoes` | Aprova com a senha e emite a autorização limitada | `201` |
 | Pagamento | `GET` | `/autorizacoes` | Lista as autorizações ativas | `200` |
 | Pagamento | `GET` | `/autorizacoes/{id}` | Obtém uma autorização | `200` |
@@ -409,6 +410,9 @@ stateDiagram-v2
   volta com máscara (`01001-000`), e o erro de CEP inexistente vem em `detalhes["endereco.cep"]`.
 - **Cancelar solicitação:** `DELETE /solicitacoes/{id}` só vale antes da aprovação e remove o documento; o histórico
   continua na auditoria.
+- **Trocar a oferta:** `PATCH /solicitacoes/{id}/itens/{indice}` com `{"id_externo": "..."}` põe uma das alternativas
+  na cesta antes da aprovação. A API recalcula as embalagens, a cesta e as políticas, e `sugestao_do_agente` continua
+  apontando para a oferta que o agente tinha escolhido.
 - O formato completo de cada resposta está na seção 10 do
   [contrato de integração](docs/plano-backend/00-contrato-de-integracao.md).
 
@@ -433,7 +437,7 @@ pytest -k devolucao             # filtra pelo nome
 - 🍃 **Banco em memória:** os testes usam o `mongomock`; não precisam do Atlas nem do `.env`.
 - 🚫 **Sem rede:** uma fixture `autouse` do `tests/conftest.py` troca `requests.Session.request` por uma função que
   falha; ViaCEP e DummyJSON são mockados com as respostas de `tests/fixtures/`.
-- 📜 **Contrato:** `tests/test_contrato*.py` confere as 27 rotas, os códigos HTTP e o `401` sem token.
+- 📜 **Contrato:** `tests/test_contrato*.py` confere as 28 rotas, os códigos HTTP e o `401` sem token.
 - ⏱️ **Tempo simulado:** cada módulo lê a hora por uma função `agora()`, que os testes trocam para simular o Pix
   vencido, o envio e a entrega.
 
