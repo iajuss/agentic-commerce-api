@@ -22,6 +22,7 @@ ROTAS_DO_CONTRATO = frozenset({
     ("GET", "/solicitacoes"),
     ("GET", "/solicitacoes/<solicitacao_id>"),
     ("DELETE", "/solicitacoes/<solicitacao_id>"),
+    ("PATCH", "/solicitacoes/<solicitacao_id>/itens/<indice>"),
     ("POST", "/solicitacoes/<solicitacao_id>/autorizacoes"),
     ("GET", "/autorizacoes"),
     ("GET", "/autorizacoes/<autorizacao_id>"),
@@ -62,10 +63,10 @@ def test_ganchos_dos_modulos_estao_ativos(app):
     assert callable(app.extensions["expirar_autorizacoes"])
 
 
-def test_mapa_da_api_tem_exatamente_as_27_rotas_do_contrato(app):
+def test_mapa_da_api_tem_exatamente_as_28_rotas_do_contrato(app):
     obtidas = {(metodo, regra) for metodo, regra, _ in _rotas_da_api(app)}
 
-    assert len(ROTAS_DO_CONTRATO) == 27
+    assert len(ROTAS_DO_CONTRATO) == 28
     assert obtidas == ROTAS_DO_CONTRATO
 
 

@@ -47,6 +47,13 @@ def remover_se_cancelavel(usuario_id, solicitacao_id):
     return "nao_cancelavel" if obter(usuario_id, solicitacao_id) else "inexistente"
 
 
+def trocar_cesta(usuario_id, solicitacao_id, itens, cesta, avaliacao):
+    """Grava a cesta com a oferta trocada só se a solicitação ainda espera aprovação. Devolve se gravou."""
+    filtro = {"_id": solicitacao_id, "usuario_id": usuario_id, "status": AGUARDANDO_APROVACAO}
+    mudanca = {"$set": {"itens": itens, "cesta": cesta, "avaliacao": avaliacao, "atualizada_em": _agora()}}
+    return _colecao().update_one(filtro, mudanca).matched_count == 1
+
+
 def registrar_compra_automatica(usuario_id, solicitacao_id, resultado):
     """Grava o retorno do gancho compra_automatica; sem resultado, explica nos motivos que é preciso aprovar."""
     mudanca = {"$set": {"compra_automatica": resultado or None, "atualizada_em": _agora()}}

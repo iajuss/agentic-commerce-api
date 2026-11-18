@@ -7,6 +7,7 @@ autorizações vencidas, pelo gancho `expirar_autorizacoes` (seção 6.3).
 """
 
 from collections import Counter
+from copy import deepcopy
 from datetime import date, datetime, timezone
 
 from flask import current_app
@@ -29,7 +30,8 @@ CATEGORIAS_ALCOOLICAS = frozenset({"cervejas", "vinhos", "destilados", "bebidas 
 
 CATALOGO_INDISPONIVEL = "Catálogo indisponível no momento. Tente novamente em instantes."
 CATALOGO_INDISPONIVEL_NO_ITEM = "Catálogo indisponível para este item"
-MOTIVO_IDADE = "bebida alcoólica (venda só para maiores de 18 anos; confira a data de nascimento no perfil)"
+OFERTA_INVALIDA = "Oferta inválida."
+MOTIVO_IDADE ="bebida alcoólica (venda só para maiores de 18 anos; confira a data de nascimento no perfil)"
 
 
 def agora():
@@ -158,8 +160,10 @@ def _processar_item(item, ofertas, politicas, preferencias, maior_de_idade):
     return {
         "descricao": item["descricao"],
         "quantidade": quantidade,
+        "quantidade_pedida": item["quantidade"],
         "status": COM_OFERTA,
         "recomendada": ranqueadas[0],
+        "sugestao_do_agente": ranqueadas[0]["id_externo"],
         "alternativas": ranqueadas[1:1 + ALTERNATIVAS],
         "descartadas": len(ofertas) - len(permitidas),
         "explicacao": explicacao,
@@ -170,12 +174,53 @@ def _item_sem_oferta(item, explicacao, descartadas):
     return {
         "descricao": item["descricao"],
         "quantidade": item["quantidade"],
+        "quantidade_pedida": item["quantidade"],
         "status": SEM_OFERTA,
         "recomendada": None,
+        "sugestao_do_agente": None,
         "alternativas": [],
         "descartadas": descartadas,
         "explicacao": explicacao,
     }
+
+
+def trocar_oferta(solicitacao, indice, id_externo, politicas, perfil):
+    """Põe na cesta uma das alternativas do item e recalcula embalagens, cesta e avaliação.
+
+    Devolve (itens, cesta, avaliacao) ou None quando a oferta pedida já é a da cesta. A oferta que saiu vira a
+    primeira alternativa, para a pessoa poder voltar atrás. Não refaz a busca: só troca entre as ofertas que o
+    ranking já aprovou, e as políticas atuais reavaliam a cesta inteira.
+    """
+    itens = deepcopy(solicitacao["itens"])
+    item = itens[indice]
+    if item["status"] != COM_OFERTA:
+        raise ErroApi(400, OFERTA_INVALIDA, {"id_externo": "Este item não tem ofertas para escolher."})
+
+    atual = item["recomendada"]
+    if atual["id_externo"] == id_externo:
+        return None
+    escolhida = next((oferta for oferta in item["alternativas"] if oferta["id_externo"] == id_externo), None)
+    if escolhida is None:
+        raise ErroApi(400, OFERTA_INVALIDA, {"id_externo": "Escolha uma das alternativas deste item."})
+
+    # Solicitações antigas não guardam a quantidade pedida; nelas vale a quantidade atual.
+    pedida = item.get("quantidade_pedida", item["quantidade"])
+    _, ajuste_antigo = embalagens_necessarias(pedida, item["descricao"], atual["titulo"])
+    quantidade, ajuste = embalagens_necessarias(pedida, item["descricao"], escolhida["titulo"])
+    explicacao = [frase for frase in item["explicacao"] if frase != ajuste_antigo]
+    if ajuste:
+        explicacao.append(ajuste)
+
+    item.update({
+        "quantidade": quantidade,
+        "quantidade_pedida": pedida,
+        "recomendada": escolhida,
+        "sugestao_do_agente": item.get("sugestao_do_agente", atual["id_externo"]),
+        "alternativas": [atual, *(oferta for oferta in item["alternativas"] if oferta is not escolhida)],
+        "explicacao": explicacao,
+    })
+    cesta = montar_cesta(itens)
+    return itens, cesta, _avaliar(itens, cesta, politicas, perfil)
 
 
 def _avaliar(itens, cesta, politicas, perfil):

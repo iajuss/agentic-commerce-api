@@ -8,12 +8,14 @@ ROTAS_DO_M2 = {
     ("GET", "/solicitacoes"),
     ("GET", "/solicitacoes/<solicitacao_id>"),
     ("DELETE", "/solicitacoes/<solicitacao_id>"),
+    ("PATCH", "/solicitacoes/<solicitacao_id>/itens/<indice>"),
 }
 
 # Campos da seção 4: o documento gravado tem exatamente estes, nem mais nem menos.
 CAMPOS_DA_SOLICITACAO = {"_id", "usuario_id", "texto", "itens", "cesta", "avaliacao", "status", "compra_automatica",
                          "criada_em", "atualizada_em"}
-CAMPOS_DO_ITEM = {"descricao", "quantidade", "status", "recomendada", "alternativas", "descartadas", "explicacao"}
+CAMPOS_DO_ITEM = {"descricao", "quantidade", "quantidade_pedida", "status", "recomendada", "sugestao_do_agente",
+                  "alternativas", "descartadas", "explicacao"}
 CAMPOS_DA_OFERTA = {"id_externo", "fonte", "titulo", "marca", "preco", "frete", "frete_gratis", "prazo_dias",
                     "estoque", "categoria", "categorias_caminho", "loja", "avaliacao", "preco_por_unidade", "unidade",
                     "link", "imagem", "pontuacao", "explicacao"}

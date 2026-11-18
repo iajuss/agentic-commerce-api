@@ -36,7 +36,7 @@ Depois disso, qualquer mudança exige PR neste arquivo aprovado pelos 3 devs (se
 - Testes: mongomock + fixtures `app`, `client`, `auth` e `cabecalho_de` de `tests/conftest.py`; um comportamento por
   teste; integrações externas sempre mockadas.
 
-## 2. Rotas do MVP (27)
+## 2. Rotas do MVP (28)
 
 As regras de URL do Flask abaixo (com os nomes dos parâmetros) são as que o teste global de contrato vai conferir no
 sábado. Rotas marcadas como públicas não exigem token; todas as outras também podem responder `401`.
@@ -58,6 +58,7 @@ sábado. Rotas marcadas como públicas não exigem token; todas as outras també
 | M2 | `GET /solicitacoes` | | Histórico (resumo) | 200 | — |
 | M2 | `GET /solicitacoes/<solicitacao_id>` | | Solicitação completa, com a explicação | 200 | 404 |
 | M2 | `DELETE /solicitacoes/<solicitacao_id>` | | Cancela antes da aprovação | 204 | 404, 409 |
+| M2 | `PATCH /solicitacoes/<solicitacao_id>/itens/<indice>` | | Troca a oferta do item por uma das alternativas | 200 | 400, 404, 409 |
 | M3 | `POST /solicitacoes/<solicitacao_id>/autorizacoes` | | Aprova com senha e gera a autorização limitada | 201 | 400, 401, 404, 409, 422 |
 | M3 | `GET /autorizacoes` | | Autorizações ativas | 200 | — |
 | M3 | `GET /autorizacoes/<autorizacao_id>` | | Uma autorização | 200 | 404 |
@@ -107,7 +108,8 @@ decrescente).
   "texto": "arroz 5kg, 2 leites integrais e detergente",
   "itens": [
     {
-      "descricao": "arroz 5kg", "quantidade": 1, "status": "com_oferta",
+      "descricao": "arroz 5kg", "quantidade": 1, "quantidade_pedida": 1, "status": "com_oferta",
+      "sugestao_do_agente": "MLB123",
       "recomendada": {
         "id_externo": "MLB123", "fonte": "mercadolivre", "titulo": "Arroz Branco Tipo 1 5kg",
         "marca": "Marca Exemplo", "preco": 27.9, "frete": 0.0, "frete_gratis": true, "prazo_dias": 2, "estoque": 50,
@@ -141,7 +143,13 @@ decrescente).
   O M2 ajusta a quantidade pedida ao tamanho da embalagem: "2 kg de feijão" com a oferta de 1 kg vira
   `quantidade: 2`, e "Dez ovos" com a caixa de 12 vira `quantidade: 1`. A explicação do item conta o ajuste
   ("Você pediu 2 kg: 2 embalagens de 1 kg").
-- Item `sem_oferta` tem `recomendada: null` e fica fora da cesta. `cesta.total` = `subtotal` + `frete`.
+- `itens[].quantidade_pedida` é a quantidade que a pessoa pediu, antes do ajuste à embalagem; serve para recalcular
+  `quantidade` quando a oferta é trocada.
+- `itens[].recomendada` é a oferta que está na cesta: a do agente ou a que a pessoa escolheu entre as `alternativas`
+  (`PATCH /solicitacoes/<id>/itens/<indice>`). `itens[].sugestao_do_agente` guarda o `id_externo` da oferta que o
+  ranking escolheu, para a tela mostrar qual era a recomendação. Na troca, a oferta que sai vira a primeira alternativa
+  e o M2 recalcula `quantidade`, `cesta` e `avaliacao` com as políticas atuais.
+- Item `sem_oferta` tem `recomendada: null` e `sugestao_do_agente: null` e fica fora da cesta. `cesta.total` = `subtotal` + `frete`.
 - `avaliacao` é calculada pelo M2 sobre a cesta inteira; o M3 confia nela (não reavalia políticas no MVP).
 - `compra_automatica` é escrito pelo M2 com o retorno do gancho da seção 6.2 (ou `null`).
 
@@ -267,7 +275,7 @@ if expirar is not None:
 | Módulo | Tipos de evento |
 |---|---|
 | M1 | `usuario_cadastrado`, `sessao_iniciada`, `login_recusado` (só quando o e-mail existe), `perfil_atualizado`, `politica_criada`, `politica_substituida`, `politica_removida` |
-| M2 | `solicitacao_criada`, `solicitacao_cancelada` |
+| M2 | `solicitacao_criada`, `solicitacao_cancelada`, `oferta_trocada` (`dados`: `item`, `de`, `para`, `total`) |
 | M3 | `autorizacao_emitida` (`dados.origem`: `manual` ou `automatica`), `reautenticacao_recusada`, `autorizacao_revogada`, `autorizacao_expirada`, `pedido_criado`, `pagamento_confirmado`, `pedido_expirado`, `pedido_cancelado`, `pedido_entregue`, `devolucao_solicitada`, `chamado_aberto` |
 
 ## 8. Configuração
@@ -304,6 +312,7 @@ O M1 carrega todas as chaves em `app/config.py` (M1-01), lendo do `.env` e conve
 | 27/10/2026 | Seção 4: oferta com `marca` e `estoque`, `texto` nulo quando vierem `itens` e `itens[].quantidade` = embalagens a comprar. Seção 10: corpo de `POST /solicitacoes` e resumo de `GET /solicitacoes` | pendente (3 devs); conferida em 31/10: implementada no `main` e coberta por `tests/test_solicitacoes.py` e `tests/test_contrato_solicitacoes.py` |
 | 30/10/2026 | Opção C do spike M2-01 (MVP sem a API do Mercado Livre). Seção 8: `CATALOGO_PROVEDOR=combinado`; `mercadolivre` e as chaves `ML_*` ficam fora do MVP. Seção 3: `integracoes` fora do MVP. Seção 4: valores de `fonte` | pendente (3 devs); conferida em 31/10: implementada no `main` e coberta por `tests/test_config.py` e `tests/test_catalogo_combinado.py` |
 | 31/10/2026 | Seções 5, 6.3 e 7: autorização vencida sem pedido vira `expirada` e devolve a solicitação para `aguardando_aprovacao` (gancho `expirar_autorizacoes` e evento `autorizacao_expirada`). Seção 10: 401 da aprovação com `detalhes.senha`; perfil aceita `endereco: null`, devolve o CEP com máscara e aponta o erro do CEP em `endereco.cep`. Seção 3: `endereco` pode ser `null` | pendente (3 devs) |
+| 18/11/2026 | Seção 2: `PATCH /solicitacoes/<solicitacao_id>/itens/<indice>` (28 rotas). Seção 4: `itens[].quantidade_pedida` e `itens[].sugestao_do_agente`; `recomendada` passa a ser a oferta da cesta, que a pessoa pode trocar antes da aprovação. Seção 7: evento `oferta_trocada` | pendente (3 devs); coberta por `tests/test_troca_de_oferta.py` e `tests/test_contrato*.py` |
 
 ## 10. Exemplos de resposta para o front
 
@@ -321,6 +330,12 @@ Quando a compra automática acontece, vem `status: "aprovada"` e
 `GET /solicitacoes` (`200`): o resumo de cada solicitação, das mais recentes para as mais antigas:
 `[{"id", "texto", "itens": ["arroz 5kg", "leites"], "status", "total", "criada_em"}]`, em que `itens` são as
 descrições e `total` é o `cesta.total`. O documento completo vem em `GET /solicitacoes/<solicitacao_id>`.
+
+`PATCH /solicitacoes/<solicitacao_id>/itens/<indice>` recebe `{"id_externo": "..."}` de uma das `alternativas` do
+item (`indice` começa em 0) e devolve (`200`) a solicitação completa, com a cesta e a avaliação recalculadas. Escolher a
+oferta que já está na cesta não muda nada. Oferta fora das alternativas ou item `sem_oferta` → `400` com
+`detalhes.id_externo`; item inexistente → `404`; solicitação fora de `aguardando_aprovacao` → `409` "Só dá para trocar
+a oferta antes de aprovar a compra."
 
 `POST /pedidos` (`201`, `Location: /pedidos/<id>`):
 

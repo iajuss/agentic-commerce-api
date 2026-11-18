@@ -65,3 +65,11 @@ def _validar_itens(itens):
 def _eh_quantidade(valor):
     # bool é subclasse de int no Python, então true/false precisam ser recusados à parte.
     return isinstance(valor, int) and not isinstance(valor, bool) and 1 <= valor <= MAXIMO_QUANTIDADE
+
+
+def validar_troca(corpo):
+    """Corpo de PATCH /solicitacoes/<id>/itens/<indice>: {"id_externo": "..."} de uma das alternativas."""
+    id_externo = corpo.get("id_externo")
+    if not isinstance(id_externo, str) or not id_externo.strip():
+        raise ErroApi(400, "Oferta inválida.", {"id_externo": "Informe a oferta escolhida."})
+    return id_externo.strip()

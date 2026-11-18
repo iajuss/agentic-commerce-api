@@ -1,4 +1,4 @@
-"""Orquestrador: POST, GET e DELETE /solicitacoes, com busca no catálogo e ranking explicável.
+"""Orquestrador: POST, GET, PATCH e DELETE /solicitacoes, com busca no catálogo e ranking explicável.
 
 Responsável: Dev 2 (módulo M2 de docs/plano-backend).
 """
@@ -12,8 +12,14 @@ from app.politicas import repositorio as repositorio_politicas
 from app.solicitacoes import repositorio
 from app.solicitacoes.auditoria import auditar
 from app.solicitacoes.catalogo import fabrica_do_provedor, obter_catalogo
-from app.solicitacoes.orquestrador import processar_solicitacao, regularizar_aprovacoes, tentar_compra_automatica
-from app.solicitacoes.validacao import validar_solicitacao
+from app.solicitacoes.orquestrador import (
+    processar_solicitacao,
+    regularizar_aprovacoes,
+    tentar_compra_automatica,
+    trocar_oferta,
+)
+from app.solicitacoes.repositorio import AGUARDANDO_APROVACAO
+from app.solicitacoes.validacao import validar_solicitacao, validar_troca
 
 bp = Blueprint("solicitacoes", __name__)
 # Confere CATALOGO_PROVEDOR ao registrar o blueprint: um provedor sem conector impede a API de subir, em vez de
@@ -22,6 +28,8 @@ bp.record_once(lambda estado: fabrica_do_provedor(estado.app.config))
 
 NAO_ENCONTRADA = "Solicitação não encontrada."
 NAO_CANCELAVEL = "Esta solicitação já foi aprovada e não pode ser cancelada."
+ITEM_NAO_ENCONTRADO = "Item não encontrado."
+NAO_TROCAVEL = "Só dá para trocar a oferta antes de aprovar a compra."
 
 
 @bp.post("/solicitacoes")
@@ -81,6 +89,43 @@ def cancelar_solicitacao(solicitacao_id):
 
     auditar(usuario_id, "solicitacao_cancelada", "solicitacao", solicitacao_id)
     return "", 204
+
+
+@bp.patch("/solicitacoes/<solicitacao_id>/itens/<indice>")
+def trocar_oferta_do_item(solicitacao_id, indice):
+    """Troca a oferta de um item por uma das alternativas: {"id_externo": "..."}."""
+    usuario_id = usuario_atual_id()
+    solicitacao_id = para_object_id(solicitacao_id)
+    id_externo = validar_troca(ler_json())
+
+    regularizar_aprovacoes(usuario_id, solicitacao_id)
+    solicitacao = repositorio.obter(usuario_id, solicitacao_id)
+    if solicitacao is None:
+        raise ErroApi(404, NAO_ENCONTRADA)
+    # O índice vem da URL como texto; "-1" ou "abc" não são um item.
+    if not indice.isdigit() or int(indice) >= len(solicitacao["itens"]):
+        raise ErroApi(404, ITEM_NAO_ENCONTRADO)
+    if solicitacao["status"] != AGUARDANDO_APROVACAO:
+        raise ErroApi(409, NAO_TROCAVEL)
+
+    indice = int(indice)
+    troca = trocar_oferta(
+        solicitacao,
+        indice,
+        id_externo,
+        repositorio_politicas.listar(usuario_id),
+        repositorio.perfil_do_usuario(usuario_id),
+    )
+    if troca is not None:
+        itens, cesta, avaliacao = troca
+        if not repositorio.trocar_cesta(usuario_id, solicitacao_id, itens, cesta, avaliacao):
+            raise ErroApi(409, NAO_TROCAVEL)  # foi aprovada entre a leitura e a gravação
+        anterior = solicitacao["itens"][indice]["recomendada"]["id_externo"]
+        dados = {"item": indice, "de": anterior, "para": id_externo, "total": cesta["total"]}
+        auditar(usuario_id, "oferta_trocada", "solicitacao", solicitacao_id, dados)
+        solicitacao = repositorio.obter(usuario_id, solicitacao_id)
+
+    return jsonify(documento_para_json(solicitacao))
 
 
 def _resumo(solicitacao):
